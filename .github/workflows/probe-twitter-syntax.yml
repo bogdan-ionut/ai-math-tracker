@@ -1,0 +1,46 @@
+name: Probe — TwitterAPI.io syntax and handle verification
+
+# Manual, read-only. Answers two questions empirically rather than by assumption:
+#   1. which search operators does TwitterAPI.io actually support?
+#   2. do the trusted-account handles in config actually exist?
+# Prints counts and verdicts only — never the key, never tweet text.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: probe-twitter
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements.txt
+
+      - name: Probe operators and handles
+        env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+        run: python -m scripts.automation.probe_syntax
+
+      - name: Upload probe report
+        uses: actions/upload-artifact@v4
+        with:
+          name: twitter-syntax-probe
+          path: probe_report.json
+          retention-days: 7
+
+      - name: Confirm read-only
+        run: |
+          if [ -n "$(git status --porcelain -- ':!probe_report.json')" ]; then
+            echo "::error::probe modified tracked files"; git status --porcelain; exit 1
+          fi
+          echo "Working tree clean."
