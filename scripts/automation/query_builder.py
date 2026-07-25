@@ -23,28 +23,30 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "config" / "twitter_discovery.json"
 
-MAX_QUERY_CHARS = 1000  # probe accepted 788 without error; stay under a round number
-
-# K10. TwitterAPI.io silently returns **zero results** — no error, HTTP 200 —
-# once a query carries 37 or more OR-terms in total. Measured, not inferred:
-# a term-by-term walk returned 20 results at every total from 10 to 36 and
-# exactly nothing at 37, and splitting that same 37 evenly across two groups
-# (10 AND 27) fails identically, so the cap is on the query total rather than
-# on any single group. The rule reproduces all 14 production queries, including
-# `named-systems` at exactly 37.
+# K10. TwitterAPI.io silently returns **zero results** — HTTP 200, empty list,
+# no error — for any query longer than 512 characters. Measured exactly: a
+# length sweep holding the term set broad and padding one group with junk
+# alternatives returned 20 results at every length up to 512 and nothing from
+# 513 on, monotonically. 512 is a backend buffer.
 #
-# This is what emptied six of fourteen queries in production for weeks. It is
-# invisible by construction: the failure looks exactly like "nobody posted
-# about this today".
-MAX_OR_TERMS = 34   # measured ceiling 36; two terms of margin
+# This emptied six of fourteen queries in production. The failure is
+# indistinguishable from "nobody posted about this today", which is why it
+# survived two live runs and a review.
+#
+# It was also briefly recorded here as a cap on OR-term *count*. That reading
+# came from a walk in which length and term count moved together; a live run
+# over 21 queries falsified it, a 34-term query returning results and a
+# 32-term one returning none.
+API_MAX_QUERY_CHARS = 512   # measured: 512 works, 513 does not
+MAX_QUERY_CHARS = 500       # what we ship, with margin
+
+_GROUP_RE = re.compile(r"\(([^()]*)\)")
 
 
 def count_or_terms(query: str) -> int:
+    """Not a limit — kept because telemetry and the calibration report use it."""
     return sum(len([t for t in m.group(1).split(" OR ") if t.strip()])
                for m in _GROUP_RE.finditer(query))
-
-
-_GROUP_RE = re.compile(r"\(([^()]*)\)")
 
 
 @dataclass
@@ -74,48 +76,60 @@ class BuiltQuery:
         }
 
 
-def split_for_term_cap(bq: BuiltQuery, cap: int = MAX_OR_TERMS) -> list[BuiltQuery]:
-    """Split a query that exceeds the OR-term cap into equivalent shards.
+def split_for_length(bq: BuiltQuery, cap: int = MAX_QUERY_CHARS) -> list[BuiltQuery]:
+    """Split a query that exceeds the 512-character limit into equivalent shards.
 
-    `(A) (B)` with B too large becomes `(A) (b1…bk)`, `(A) (bk+1…)`, … The union
-    of the shards is exactly the original query, because a disjunction
-    distributes over the conjunction:
+    `(A) (B)` with the whole thing too long becomes `(A) (b1…bk)`,
+    `(A) (bk+1…)`, … The union of the shards is exactly the original query,
+    because a disjunction distributes over a conjunction:
 
         (A) AND (b1 OR b2)  ≡  [(A) AND b1] OR [(A) AND b2]
 
-    So this costs extra API calls and loses nothing. That matters: the
-    alternative — dropping terms until the query fits — would silently narrow
-    what we look for, which is the same class of invisible loss as K10 itself.
+    So sharding costs extra API calls and loses nothing. That matters: the
+    alternative — dropping terms until the query fits, which this module used
+    to do above `MAX_QUERY_CHARS` — silently narrows what we look for, which is
+    the same class of invisible loss as K10 itself.
 
-    Only the largest group is split. If that is not enough to fit (which no
-    current query needs), the shard is returned over-cap rather than quietly
-    truncated, and `over_cap` marks it so a test can fail loudly.
+    Terms differ in length, so chunks are packed greedily against the real
+    assembled length rather than by counting. Only the longest group is split;
+    if a single term still cannot fit, the shard is returned over-cap rather
+    than quietly truncated and `over_cap` marks it so a test fails loudly.
     """
-    if not bq.groups or count_or_terms(bq.query) <= cap:
+    if not bq.groups or len(bq.query) <= cap:
         return [bq]
 
-    biggest = max(range(len(bq.groups)), key=lambda i: len(bq.groups[i]))
-    others = sum(len(g) for i, g in enumerate(bq.groups) if i != biggest)
-    room = cap - others
-    grp = bq.groups[biggest]
-
-    if room < 1:
-        bq.over_cap = True
-        return [bq]
-
-    chunks = [grp[i:i + room] for i in range(0, len(grp), room)]
     tail = _GROUP_RE.sub("", bq.query).split()
+    widest = max(range(len(bq.groups)),
+                 key=lambda i: len(_or_group(bq.groups[i])))
+
+    def assemble(chunk: list[str]) -> str:
+        groups = [chunk if i == widest else g for i, g in enumerate(bq.groups)]
+        return " ".join([_or_group(g) for g in groups] + tail)
+
+    chunks: list[list[str]] = []
+    current: list[str] = []
+    for term in bq.groups[widest]:
+        if current and len(assemble(current + [term])) > cap:
+            chunks.append(current)
+            current = [term]
+        else:
+            current.append(term)
+    if current:
+        chunks.append(current)
 
     shards: list[BuiltQuery] = []
     for n, chunk in enumerate(chunks, start=1):
-        groups = [chunk if i == biggest else g for i, g in enumerate(bq.groups)]
-        query = " ".join([_or_group(g) for g in groups] + tail)
+        groups = [chunk if i == widest else g for i, g in enumerate(bq.groups)]
+        query = assemble(chunk)
         shards.append(BuiltQuery(
-            id=f"{bq.id}#{n}", family=bq.family, tier=bq.tier, query=query,
-            purpose=f"{bq.purpose} (shard {n}/{len(chunks)})",
+            id=f"{bq.id}#{n}" if len(chunks) > 1 else bq.id,
+            family=bq.family, tier=bq.tier, query=query,
+            purpose=(f"{bq.purpose} (shard {n}/{len(chunks)})"
+                     if len(chunks) > 1 else bq.purpose),
             max_results=bq.max_results, expected_precision=bq.expected_precision,
             routes_to=bq.routes_to, groups=groups, negatives=bq.negatives,
-            shard_of=bq.id, over_cap=count_or_terms(query) > cap,
+            shard_of=bq.id if len(chunks) > 1 else None,
+            over_cap=len(query) > cap,
         ))
     return shards
 
@@ -181,16 +195,11 @@ def build_queries(tax: dict | None = None) -> list[BuiltQuery]:
             negatives = _cluster(tax, "negative")
             core += " " + " ".join(f"-{t}" for t in negatives)
 
+        # Over-length queries are sharded, not trimmed. This used to drop whole
+        # groups here, which changed what the query meant without saying so.
         query = (core + suffix).strip()
-        if len(query) > MAX_QUERY_CHARS:
-            # Never silently truncate a query — that would change its meaning.
-            # Drop the lowest-value group (the last one) and record it.
-            while len(query) > MAX_QUERY_CHARS and len(groups) > 1:
-                groups.pop()
-                parts = [_or_group(g) for g in groups]
-                query = (" ".join(parts) + suffix).strip()
 
-        out.extend(split_for_term_cap(BuiltQuery(
+        out.extend(split_for_length(BuiltQuery(
             id=fam["id"], family=fam["id"], tier=tier, query=query,
             purpose=fam.get("purpose", ""),
             max_results=int(tier_cfg.get("maxResultsPerRun", 20)),
