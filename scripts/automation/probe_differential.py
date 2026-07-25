@@ -250,30 +250,36 @@ def bisect_conjunction(probe: Probe, query: str) -> dict:
         return {}
 
     small, big = groups[0][:2], groups[1]
-    sizes = [n for n in (35, 28, 24, 20, 16, 12, 8) if n <= len(big)]
-    results: dict[int, int] = {}
-    for n in sizes:
-        t = probe.run(f"2 AND {n} terms", f"{g(small)} {g(big[:n])} {tail}")
+    results: dict[int, int] = {}          # keyed by TOTAL terms in the query
+    for n in [n for n in range(8, len(big) + 1) if n <= len(big)]:
+        if not (n <= 8 or 27 <= n):       # walk the suspected boundary closely
+            continue
+        t = probe.run(f"2 AND {n} terms (total {n + 2})",
+                      f"{g(small)} {g(big[:n])} {tail}")
         if t.error is None:
-            results[n] = t.returned
+            results[n + 2] = t.returned
 
-    working = [n for n, got in results.items() if got > 0]
-    failing = [n for n, got in results.items() if got == 0]
-    boundary = max(working) if working else None
-    out = {"perSize": results, "largestWorking": boundary,
-           "smallestFailing": min(failing) if failing else None}
+    working = [t for t, got in results.items() if got > 0]
+    failing = [t for t, got in results.items() if got == 0]
+    out = {"byTotalTerms": results,
+           "largestWorkingTotal": max(working) if working else None,
+           "smallestFailingTotal": min(failing) if failing else None}
+    out["monotone"] = bool(working and failing
+                           and max(working) < min(failing))
 
-    # Same total, split evenly — the discriminating case.
-    if boundary and failing:
-        total = min(failing) + 2
-        half = total // 2
-        if half <= len(groups[0]) and half <= len(big):
-            t = probe.run(f"{half} AND {total - half} terms (same total, even split)",
-                          f"{g(groups[0][:half])} {g(big[:total - half])} {tail}",
-                          f"total {total} failed as 2 AND {min(failing)}")
+    # The discriminating case: same total, split evenly. A cap on the total
+    # fails it; a cap on the largest single group survives it.
+    if failing:
+        total = min(failing)
+        half = min(total // 2, len(groups[0]))
+        rest = total - half
+        if rest <= len(big) and half >= 2:
+            t = probe.run(f"{half} AND {rest} terms (total {total}, even split)",
+                          f"{g(groups[0][:half])} {g(big[:rest])} {tail}",
+                          f"same total that failed as 2 AND {total - 2}")
             if t.error is None:
                 out["evenSplitAtFailingTotal"] = t.returned
-                out["capIsOn"] = "total" if t.returned == 0 else "the largest group"
+                out["capIsOn"] = "the total" if t.returned == 0 else "one group"
     return out
 
 
@@ -314,12 +320,16 @@ def main() -> int:
     else:
         print(f"\n  VERDICT: inconclusive — {result.get('why')}")
 
-    if limits.get("largestWorking"):
-        print(f"\n  Largest second group that survives a conjunction: "
-              f"{limits['largestWorking']} terms "
-              f"(fails at {limits['smallestFailing']}).")
+    if limits.get("largestWorkingTotal"):
+        print(f"\n  Largest total OR-term count that returns results: "
+              f"{limits['largestWorkingTotal']}")
+        print(f"  Smallest that returns nothing              : "
+              f"{limits['smallestFailingTotal']}")
+        print(f"  Monotone across the walk                   : {limits['monotone']}")
         if "capIsOn" in limits:
-            print(f"  The cap is on {limits['capIsOn']}.")
+            print(f"  Splitting the failing total evenly still "
+                  f"{'fails' if limits['evenSplitAtFailingTotal'] == 0 else 'works'}"
+                  f" → the cap is on {limits['capIsOn']}.")
 
     OUT.write_text(json.dumps({
         "target": TARGET,
