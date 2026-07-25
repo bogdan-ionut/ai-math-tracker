@@ -174,67 +174,76 @@ classifier**. Excluding them by keyword would cost real signal — `-counterexam
 
 ---
 
-## 5b. K10 — six queries return zero, reproducibly (cause still unknown)
+## 5b. K10 — solved: TwitterAPI.io silently truncates at 512 characters
 
-**Status: reproduced, narrowed, not solved.**
+**Status: solved, fixed and verified live.**
 
-Two live dry runs on separate days, both with working API credit
-(`30156362824`, `30173575305`), returned **the same six queries at exactly zero**:
+Any query longer than **512 characters** returns HTTP 200 with an empty tweet list. No
+error, no warning, no truncation notice. The failure is indistinguishable from "nobody
+posted about this today", which is why it survived two live runs, an external review and a
+232-test suite while emptying six of fourteen queries.
 
-| Returns results | Returns 0 (both runs) |
-|---|---|
-| `problem-registries` 20 · `arxiv-linked` 20 · `broad-recall` 20 · `account-*` 5–20 | `explicit-ai-solution` · `academic-announcement` · `formal-verification` · `disputes-and-corrections` · `artifact-release` · `named-systems` |
+### The measurement
 
-Identical results across both runs except `account-GoogleDeepMind` (6 → 8), which is just
-new posts. **This is structural, not flakiness.**
-
-### What has been ruled out
-
-**Query length — definitively.** A bisecting probe (`probe-length.yml`, run `30173530836`)
-walked one real query down from 462 to 67 characters:
+A length sweep held the term set broad — padding one OR-group with junk alternatives, which
+can only widen a disjunction — so any drop to zero had to be the limit rather than a change
+in what matches:
 
 ```
-chars   ai  obj   returned
-  462   22    9         20
-  417   18    9          0     ← the only zero
-  383   14    9         20
-  339 … 67                20   (all)
+chars   returned
+  …512        20
+   513         0     ← and every length above it
 ```
 
-A 462-character query returns results while a 417-character one returns none, and
-everything shorter returns results. There is no length cutoff. The Sprint 1.5 probe had
-reported an 788-char query as `ACCEPTED returned=0` and I recorded "length is not a
-constraint" — the *accepted* half was right, but I should have investigated the zero
-instead of attributing it to nonsense test terms.
+Monotone, exact, and 512 is a round backend buffer.
 
-**Simple OR-term count — also ruled out.** The eight working queries carry ≤ 28 OR-terms and
-the six failing ones ≥ 31, which looks like a clean split, but the length probe contradicts
-it: a 31-term query returned 20 while a 27-term one returned 0. Whatever the boundary is, it
-is not a plain term count.
+### Two wrong answers on the way, and what killed each
 
-### What is still consistent with the evidence
+**Query length "definitively ruled out."** The earlier bisect walked 462 → 67 chars and
+found no cutoff, because every length it tested was already under 512 except one; the single
+`417 → 0` reading was noise I built a conclusion around.
 
-The six failing queries all demand a **conjunction of three or more independent concept
-groups**, or a group made almost entirely of quoted multi-word phrases. The four working
-ones are either two loose groups, an account filter, or anchored by `url:`. That may mean
-they are genuinely restrictive — a post containing *"verified in Lean"* **and** a named AI
-system inside the searchable window may simply not exist — or it may mean the backend
-silently degrades on certain query shapes.
+**An OR-term cap at 37.** A term-by-term walk showed 36 terms returning results and 37
+returning none, monotonically, and that rule reproduced all 14 production queries. It was
+still wrong: term count and length moved together in that walk. The live run over the first
+sharded query set falsified it within the hour — a 34-term query returned 20 results and a
+32-term one returned none, while length separated all 16 observations with no overlap. The
+lesson worth keeping is that the rule fitting 14 of 14 observations was not evidence it was
+the *right* variable, only that it correlated with one.
 
-**The two are distinguishable, and Sprint 5.3 must distinguish them** before the shapes are
-trusted. The experiment is a *differential* probe: take one failing query verbatim and
-remove one element at a time (drop a group, unquote a phrase, shorten a cluster) until it
-starts returning results. That isolates the responsible element rather than testing a
-hypothesis about it.
+What did settle it was a **witness test**: search one group alone, take a post the API
+itself just returned, verify from its text that it satisfies the second group too, then ask
+for the conjunction. Post `2081117415794987476` contains both `"independently verified"` and
+`AI`, is demonstrably indexed, and the conjunction returned nothing — even narrowed to
+`from:` its own author. That excluded "the window is genuinely empty" and left only the
+query shape.
 
-### Consequence today
+### The fix — shard, never trim
 
-The high-precision families — including `disputes-and-corrections`, the one added
-specifically because both `disputed` records in this dataset are dispute signals — **are
-returning nothing in production**. Everything currently collected comes from
-`problem-registries`, `arxiv-linked`, `broad-recall` and the trusted accounts.
+`(A) AND (b1 OR b2)` is exactly `[(A) AND b1] OR [(A) AND b2]`, so a long query is split
+into shards whose union is the original. It costs extra calls and loses nothing. Chunks are
+packed greedily against real assembled length, since terms differ in width, and a term that
+cannot fit at all is flagged `over_cap` rather than dropped.
 
-Measured corroboration across both runs: **3/20 and 4/35 — 11–15%**. The external-reference
+This also replaced the old behaviour above `MAX_QUERY_CHARS`, which dropped whole OR-groups
+to make a query fit — silently changing what the query meant, the same class of invisible
+loss as K10 itself.
+
+**14 queries became 23**, longest 497 characters against a ship cap of 500 and a measured
+limit of 512.
+
+### Verified live
+
+| | before | after |
+|---|---|---|
+| queries returning results | 8 / 14 | **22 / 23** |
+| tweets fetched | 35 | **209** |
+
+The single remaining zero is `academic-announcement#4` at 403 characters — comfortably under
+the cap, so that one is a genuine empty result rather than the bug. `disputes-and-corrections`,
+added precisely because both `disputed` records here are dispute signals, returns posts again.
+
+Measured corroboration before the fix: **3/20 and 4/35 — 11–15%**. The external-reference
 gate is doing most of the filtering, exactly as designed.
 
 ## 6. Telemetry

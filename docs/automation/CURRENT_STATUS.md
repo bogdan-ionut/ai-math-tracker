@@ -6,7 +6,7 @@
 
 **Last updated:** 2026-07-25
 **Phase:** executing the revised plan
-**Next sprint:** 5.3 — Retrieval correctness
+**Next sprint:** 5.3 remainder — server-side time windows and quota fairness
 **Live writes:** 🔴 **disabled** (`dryRunOnSchedule: true`) — gate is Sprint 5.5
 
 ---
@@ -33,8 +33,8 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (274), and CI gates every merge |
-| Retrieval correctness | **defective** — a busy query silently loses matches |
+| Local test coverage | good (309), and CI gates every merge |
+| Retrieval correctness | K10 fixed (22/23 queries return); `since_time` and quota fairness still open |
 | Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | JSON-parseable only, not model-validated |
 | Empirical calibration | **none** — the scheduled dry run has never exercised Gemini |
@@ -60,7 +60,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | **R3** | `review` observations re-extracted daily (wasted Gemini) | 🟠 major | 5.4 |
 | **R4** | Pydantic models do not validate persisted files | 🟠 major | 5.4 |
 | **R11** | Unfair per-run cap; overflow counted, not queued | 🟠 major | 5.3 |
-| **K10** | Six of fourteen queries return zero — **reproduced twice**; length and term-count ruled out, cause still unknown | 🟠 major | 5.3 |
+| ~~K10~~ | ~~Six of fourteen queries return zero~~ — TwitterAPI.io truncates at 512 chars | ✅ | closed 5.3 |
 | **R6** | Corroboration accepts a bare GitHub link | 🟠 major | 6 |
 | ~~R7~~ | ~~No CI runs the tests~~ | ✅ | closed 5.1 |
 | ~~R15~~ | ~~Bot push has no rebase/retry~~ | ✅ | closed 5.1 |
@@ -103,7 +103,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 274 / 274 (`python -m pytest`) — no network, no API keys.
+**Passing:** 309 / 309 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
 was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
@@ -113,6 +113,13 @@ every one of 232 tests took the branch that has no judge in it.
 ---
 
 ## Completed since the re-plan
+
+### Sprint 5.3 (part) — K10 solved ✅
+
+TwitterAPI.io silently truncates at **512 characters**. Long queries are now sharded into
+equivalent smaller ones rather than trimmed, and the old group-dropping truncation path is
+gone. **22 of 23 queries return results, against 8 of 14 before; 209 tweets per run against
+35.** Full account above. Remaining in this sprint: R2 and R11.
 
 ### Sprint 5.2 — Make the judge actually decide ✅
 
@@ -165,23 +172,41 @@ carry "deferred, mutate nothing" as distinct from "concluded", and A3 needs exac
 
 ---
 
-## K10 narrowed (2026-07-25)
+## K10 solved (2026-07-25)
 
-Re-measured now that credit is restored. The same six queries return zero on a second run
-days apart — **structural, not transient**. Query length is definitively ruled out (462
-chars works, 417 does not, everything shorter works). A plain OR-term count is ruled out
-too. The failing six all demand three-or-more concept groups or an all-quoted-phrase group;
-whether that makes them genuinely restrictive or trips a backend limit is the question
-Sprint 5.3 opens with, using a differential probe that strips one element at a time.
+**TwitterAPI.io returns HTTP 200 and an empty list for any query over 512 characters.** No
+error. The failure looks exactly like "nobody posted about this today", which is how it
+emptied six of fourteen queries through two live runs, an external review and a 232-test
+suite.
 
-Consequence worth stating: `disputes-and-corrections` — added precisely because both
-`disputed` records here are dispute signals — is currently returning nothing in production.
+A length sweep with the term set held broad puts the boundary at exactly 512 → 20 results,
+513 → none, monotone. The fix shards long queries instead of trimming them, since a
+disjunction distributes over a conjunction and the union of the shards is the original
+query. It also removed the old truncation path, which dropped whole OR-groups to make a
+query fit — silently narrowing what we looked for.
+
+| | before | after |
+|---|---|---|
+| queries returning results | 8 / 14 | **22 / 23** |
+| tweets fetched per run | 35 | **209** |
+
+Two hypotheses died on the way, and how they died is the useful part. "Length definitively
+ruled out" came from a bisect that never crossed 512 except once, and I built a conclusion
+on that single reading. "A cap at 37 OR-terms" fit all 14 production queries and was still
+wrong — length and term count moved together in the walk that produced it. Fitting every
+observation was evidence of correlation, not of the right variable.
+
+What actually decided it was a **witness test**: take a post the API itself returned, verify
+from its own text that it satisfies both concept groups, then ask for the conjunction. It
+came back empty even scoped to the author's own feed, which excludes "the window is empty"
+and leaves only the query shape.
 
 ---
 
 ## Next task
 
-**Sprint 5.3 — Retrieval correctness.** R2, R11 and K10. Open with the K10 differential
-probe — stripping one element at a time from a failing query — because the answer decides
-whether the six dead queries need rewriting or whether we are hitting an undocumented
-backend limit that also constrains the fix for R2.
+**Sprint 5.3, remainder.** K10 is closed. Still open in this sprint: **R2** (server-side
+`since_time` / `until_time`, so the lookback window stops being applied after the API has
+already chosen 20 results) and **R11** (fair per-query quota with a backlog instead of an
+overflow counter). Both are now more valuable than they were this morning, because 23
+queries returning 209 tweets is a very different load profile from 8 returning 35.
