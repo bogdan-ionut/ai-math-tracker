@@ -8,7 +8,7 @@
 **Last updated:** 2026-07-25
 **Current sprint:** Sprint 1 — Test scaffolding + deterministic ingestion · **completed**
 **Next recommended task:** Sprint 2 — Gemini structured extraction (`gemini-3.6-flash`)
-**Awaiting:** result of the manual TwitterAPI.io smoke test; Q2/Q3 in §6
+**Awaiting:** Q2/Q3 in §6 (smoke test ✅ passed 2026-07-25)
 
 ---
 
@@ -46,6 +46,22 @@
 Dry-run over the fixture: 100 fetched → **4 unique** after deduplication (the retweet
 collapses onto its original), **3 of 4 carry an external identifier**; the fourth is a
 no-link opinion tweet, which is exactly what the corroboration gate is for.
+
+**Live smoke test — passed** (run `30154800586`, 2026-07-25):
+
+| | |
+|---|---|
+| secret | present, masked in logs (`***`) |
+| api calls | 1 |
+| tweets returned | 20 |
+| normalised / unique | 20 / 20 |
+| **with external identifier** | **3 of 20 (15%)** |
+| response shape | matches the client's expectations |
+| working tree | clean — the job wrote nothing |
+
+The 15% corroboration rate is the important number: it is measured, not assumed, and it
+says a pipeline without the corroboration gate would produce roughly six unverifiable
+candidates for every corroborated one. Logged in ARCHITECTURE_ASSESSMENT §2.1.
 
 ---
 
@@ -120,7 +136,7 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 |---|---|---|
 | U1 | ~~Add repository secret `TWITTERAPI_IO_KEY`~~ | ✅ Done 2026-07-25 |
 | U2 | ~~Add repository secret `GEMINI_API_KEY`~~ | ✅ Done 2026-07-25 |
-| U5 | **Run the smoke test**: Actions → "Smoke test — TwitterAPI.io connectivity" → Run workflow. Confirms the key works and the response shape matches the client. | Now |
+| U5 | ~~Run the TwitterAPI.io smoke test~~ | ✅ Passed 2026-07-25 (run 30154800586) |
 | U3 | Confirm Actions has **write** permission for the collector (Settings → Actions → General → Workflow permissions → Read and write) | Sprint 5 |
 | U4 | Answer the open questions in §6 | Sprint 1 |
 
@@ -135,7 +151,7 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 | Q1 | Do you accept the **corroboration gate** (D4) — a tweet with no arXiv/DOI/Lean/Erdős identifier goes to the review queue rather than becoming a candidate? | Yes, apply it |
 | Q2 | Should the public site ever show unverified signals (Sprint 7), given this project's whole premise is filtering hype? | Build it, keep it behind a flag, decide after seeing the false-positive rate |
 | Q3 | Is committing **tweet text** to a public repo acceptable, or should only the hash + link be stored? | Store excerpt + hash; make it configurable |
-| Q4 | Should Sprint 6 (arXiv / erdosproblems) be pulled **ahead** of the Twitter work, given it is higher-precision and cheaper? | No — follow the brief; Twitter first |
+| Q4 | Should Sprint 6 (arXiv / erdosproblems) be pulled **ahead**? The live smoke test measured only **15% corroboration** on X, which strengthens the case. | Follow the brief for now; revisit after a week of real data |
 
 ---
 
@@ -154,5 +170,5 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 6. Tests with mocked responses: success, malformed JSON, schema violation, timeout,
    rate-limit, cache hit.
 
-**Before starting**, run the smoke test (U5) so we know the live response shape matches
-the fixtures this sprint was built against.
+The smoke test has confirmed the live response shape matches the fixtures this sprint was
+built against, so Sprint 2 can proceed on the existing fixtures.

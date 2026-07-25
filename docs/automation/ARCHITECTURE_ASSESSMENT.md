@@ -135,9 +135,22 @@ objective explicitly asks for it. I am recommending two things:
    Building the ingestion layer source-agnostic from day one (an `Observation` with a
    `sourceType`) costs nothing now and makes this a config change later.
 
+**Measured, 2026-07-25 (live smoke test, run 30154800586).** Query
+`AlphaProof OR "Erdős problem"`, one API call, 20 tweets returned, 20 unique observations:
+
+> **3 of 20 (15%) carried any external identifier at all.**
+> The other 17 had no arXiv id, no DOI, no Erdős number, no Lean or GitHub link — and the
+> first result was an unrelated account with zero links.
+
+This is the base rate of the source, measured rather than assumed. It means a naive
+pipeline would generate roughly **six unverifiable candidates for every corroborated one**.
+The corroboration gate is therefore not a nicety; without it the candidate store becomes
+mostly noise within days.
+
 **Verdict:** proceed with Twitter as specified, but with corroboration-gated promotion,
 and design the ingestion interface so additional sources are a plug-in rather than a
-rewrite.
+rewrite. The 15% figure should be re-measured once the real query set has run for a week;
+if it holds, Sprint 6 (higher-precision sources) should be brought forward.
 
 ### 2.2 Do NOT migrate `results.json`. Add a parallel layer. (Explicitly requested evaluation)
 
