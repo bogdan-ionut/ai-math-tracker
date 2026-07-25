@@ -1,0 +1,28 @@
+name: Probe — server-side time window
+# R2. The syntax probe recorded since: as "supported" because it returned 20
+# results, which an ignored operator also does. This checks that the window is
+# actually applied: dates inside a past window, nothing at all for a future one.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements.txt
+      - env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+        run: |
+          python -m scripts.automation.probe_timewindow | tee out.txt
+          { echo "### Server-side time window"; echo; echo '```'; cat out.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: timewindow-probe
+          path: timewindow_probe.json
+          retention-days: 30
