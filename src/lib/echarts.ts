@@ -24,12 +24,21 @@ echarts.use([
 
 export { echarts };
 
-/** Read a CSS token ("R G B") off :root and return an rgb() / rgba() string. */
+/**
+ * Read a CSS token ("R G B") off :root and return a colour string.
+ *
+ * Must emit COMMA-separated rgb()/rgba(). zrender (ECharts' renderer) parses
+ * colours itself and does not understand CSS Color 4 space-separated syntax
+ * — `rgba(17 17 20 / 0.16)` silently falls back to opaque, which turns every
+ * translucent area fill into a solid slab.
+ */
 export function token(name: string, alpha = 1): string {
   if (typeof window === "undefined") return "#888";
   const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   if (!raw) return "#888";
-  return alpha >= 1 ? `rgb(${raw})` : `rgba(${raw} / ${alpha})`;
+  const [r, g, b] = raw.split(/[\s,]+/);
+  if (!r || !g || !b) return "#888";
+  return alpha >= 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export interface ChartTheme {
