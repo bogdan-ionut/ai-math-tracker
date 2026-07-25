@@ -6,8 +6,8 @@
 > meaningless daily diffs. See assessment §2.7.
 
 **Last updated:** 2026-07-25
-**Current sprint:** Sprint 3 — Entity matching and shortlist · **completed**
-**Next recommended task:** Sprint 4 — safe merge engine and review queue
+**Current sprint:** Sprint 4 — Safe merge engine and review queue · **completed**
+**Next recommended task:** Sprint 5 — scheduled GitHub Actions workflow
 **Awaiting:** Q2/Q3 in §6; optional manual confirmation of the `teorth` / `erdosproblems` handles
 
 ---
@@ -153,11 +153,40 @@ Two bugs the work surfaced, both caught by tests rather than review:
    unambiguous match — precisely the failure the design exists to prevent. Conflict now
    excludes the record entirely rather than merely annotating the outcome.
 
+### Sprint 4 — Safe merge engine and review queue ✅
+
+The sprint the previous three were protecting. Python decides what happens; the
+model only supplies a label.
+
+- **`policy.py`** — the field allowlist (`status`→audited, `auditedAt`, `impact`,
+  `assessment`, `confidence`, `auditNotes`, `provenanceNote` can never be written by
+  automation) and `assert_registry_untouched`, which diffs the whole curated file.
+- **`merge.py`** — one handler per decision, all additive. `data/results.json` is never
+  opened for writing anywhere in the module.
+- **`review.py`** — typed reasons, stable ids, and a resolved entry is **never reopened**
+  (re-asking an answered question daily is how a queue becomes noise nobody reads).
+- **`pipeline.py`** — match → judge → merge, with the judge budget-capped and built
+  lazily.
+- 57 tests; **204 total**.
+
+Offline end-to-end over the fixtures: 4 observations → 3 corroborated → **3 candidates
+created, 1 gated into review**, byte-identical on re-run, registry untouched.
+
+Two design points the tests forced:
+
+1. **The judge client is now lazy.** It was constructed up front, so a run where every
+   observation resolved deterministically still demanded `GEMINI_API_KEY` for a call it
+   was never going to make. It is built on first genuine need; if it cannot be built, the
+   verdict stays `None` and `decide` returns `insufficient_information` rather than guessing.
+2. **An ambiguous *and* uncorroborated post reaches review by the ambiguity path, not the
+   gate.** Both end in review — the safety property holds either way — but the test now
+   pins both routes so a future refactor cannot quietly collapse them.
+
 ---
 
 ## Remaining work
 
-Sprints 4–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
+Sprints 5–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 
 ---
 
@@ -191,6 +220,9 @@ Sprints 4–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 | D24 | Curated identity is derived from **title + erdosNumber only**, never the description | A description may cite another problem; treating that as identity made one identifier point at two records |
 | D25 | An identifier conflict **excludes the record from all matching phases** | Otherwise a fuzzy title match can override an explicit disagreement — Erdős #999 matched #728 at score 100 before this |
 | D26 | The judge sees no editorial field and no engagement data | It decides identity, never merit |
+| D27 | The judge client is built **lazily** | A deterministic-only run must not require an API key for a call it will never make |
+| D28 | A **resolved** review entry is never reopened | A human already answered; re-asking daily turns the queue into noise |
+| D29 | An unrecognised decision goes to **review**, not to a default | An unknown label is a question, not a licence to act |
 
 ---
 
@@ -227,7 +259,7 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 ## Tests
 
-**Currently passing:** 147 / 147 (`python -m pytest`) — no network, no API keys required.
+**Currently passing:** 204 / 204 (`python -m pytest`) — no network, no API keys required.
 **Currently failing:** none.
 **Build health:** `python scripts/build_data.py` ✅ · `pnpm build` ✅ · live deploy ✅
 **`data/results.json`:** byte-identical — asserted by `test_curated_results_are_never_touched`.

@@ -12,7 +12,7 @@ proposed sequence are flagged **[amended]** with a reason.
 | 1.5 | Query strategy, syntax probe and calibration **[amended]** | **completed** |
 | 2 | Gemini structured extraction | **completed** |
 | 3 | Entity matching and shortlist | **completed** |
-| 4 | Safe merge engine and review queue | planned |
+| 4 | Safe merge engine and review queue | **completed** |
 | 5 | Scheduled GitHub Actions workflow | planned |
 | 6 | Additional high-precision sources **[amended]** | planned |
 | 7 | Frontend candidate visibility (optional) | planned |
@@ -175,7 +175,7 @@ called when a deterministic match exists. Conflicting explicit identifiers **nev
 
 ---
 
-## Sprint 4 — Safe merge engine and review queue · `planned`
+## Sprint 4 — Safe merge engine and review queue · `completed`
 
 **Objective.** Apply decisions deterministically, in Python, with a field allowlist.
 
