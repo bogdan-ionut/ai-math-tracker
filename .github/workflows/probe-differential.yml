@@ -1,0 +1,35 @@
+name: Probe — K10 differential
+# Dissects a query that returns zero in production, one element at a time, then
+# runs a witness test: a post the API itself returned, verified to satisfy both
+# concept groups, is asked for again through the conjunction. If it does not
+# come back, the shape is at fault rather than the world being empty.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements.txt
+      - env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+        run: |
+          python -m scripts.automation.probe_differential | tee probe_out.txt
+          {
+            echo "### K10 differential probe"
+            echo ""
+            echo '```'
+            cat probe_out.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: differential-probe
+          path: differential_probe.json
+          retention-days: 30
