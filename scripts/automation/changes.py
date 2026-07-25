@@ -36,6 +36,15 @@ INCIDENTAL = (
     "data/automation/query_telemetry.json",
 )
 
+# Written at the repo root by a run and uploaded as artifacts, never committed.
+# They are gitignored, but a run on a dirty checkout can still surface them, and
+# they are not evidence that the run touched something it should not have.
+IGNORED_AT_ROOT = frozenset({
+    "ingest.json", "extract.json", "pipeline.json",
+    "calibration_report.json", "probe_report.json", "length_probe.json",
+    "calibration.txt",
+})
+
 # Volatile keys ignored when comparing — they move on every run by design.
 VOLATILE_KEYS = {"lastRunAt", "runAt", "lastSeenAt", "collectedAt", "generatedAt"}
 
@@ -56,11 +65,23 @@ def _git(*args: str, cwd: Path | None = None) -> str:
 
 
 def changed_paths(cwd: Path | None = None) -> list[str]:
-    out = _git("status", "--porcelain", "--", "data/automation", cwd=cwd)
+    """Every path git reports as changed, repository-wide.
+
+    Deliberately NOT scoped to data/automation. Scoping it there made the
+    `unexpected` check below unreachable — it filtered for paths outside a set
+    that could only contain paths inside it. The whole point of that check is to
+    notice a run touching something it should not, above all the curated
+    registry, so it has to see the whole tree.
+    """
+    out = _git("status", "--porcelain", cwd=cwd)
     paths = []
     for line in out.splitlines():
         if len(line) > 3:
-            paths.append(line[3:].strip().strip('"'))
+            path = line[3:].strip().strip('"')
+            # renames are reported as "old -> new"; the destination is what matters
+            if " -> " in path:
+                path = path.split(" -> ", 1)[1]
+            paths.append(path)
     return paths
 
 
@@ -88,10 +109,11 @@ def assess(cwd: Path | None = None) -> dict:
         p for p in changed
         if p in SUBSTANTIVE and file_is_substantively_changed(p, cwd)
     ]
-    incidental = [p for p in changed if p in INCIDENTAL or p not in SUBSTANTIVE]
+    automation = [p for p in changed if p.startswith("data/automation/")]
+    incidental = [p for p in automation if p not in substantive]
     unexpected = [
         p for p in changed
-        if not p.startswith("data/automation/")
+        if not p.startswith("data/automation/") and p not in IGNORED_AT_ROOT
     ]
     return {
         "changed": changed,

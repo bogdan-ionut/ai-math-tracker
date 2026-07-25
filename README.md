@@ -43,15 +43,40 @@ Invariants the pipeline enforces:
 - `members`, when listed, must account for `count`;
 - ids are unique.
 
-## Update workflow (curated, no scraping)
+## Two data layers, and what may write to each
 
-1. Edit `data/results.json` (add new results, promote provisional → audited, etc.).
+| Layer | Owner | Written by |
+|---|---|---|
+| `data/results.json` — the curated registry the site renders | **human curator** | people only |
+| `data/automation/**` — observations, candidates, review queue | discovery pipeline | automation |
+
+**Automation can never write the curated registry.** Not a field, not a record, not the
+ordering. `policy.assert_registry_untouched` fails the run if the file moves at all, and a
+test asserts the whole decision sweep leaves it byte-identical.
+
+### Updating the curated registry (human)
+
+1. Edit `data/results.json` — add results, promote provisional → audited, record a dispute.
 2. `python scripts/build_data.py` — validates and regenerates `public/data/*.json`.
 3. Commit & push to `main` → GitHub Actions rebuilds and redeploys.
 
-There is deliberately **no automated scraper**: heterogeneous "AI solved X" sources
-would import hyped/false claims and break the confidence tiers. New items enter through
-review. (An optional candidate-harvester that opens a draft issue can be added later.)
+### The discovery pipeline (automated)
+
+A daily workflow searches X for AI-mathematics claims, extracts them with Gemini, matches
+them against the registry, and files them as **candidates** or **review-queue entries**.
+Candidates are proposals: they are never presented as verified, never counted in any
+headline metric, and never promoted into the registry without a human.
+
+A social post with no external identifier (arXiv, DOI, OEIS, Erdős number, Lean or GitHub
+artifact) does not become a candidate at all — it goes to review. That gate exists because
+the base rate was measured: of 20 live tweets matching our queries, **3 carried any external
+identifier**.
+
+> **Status: the scheduled run does not write yet.** `schedule.dryRunOnSchedule` is `true`
+> while the pipeline is calibrated end to end. See
+> [docs/automation/CURRENT_STATUS.md](docs/automation/CURRENT_STATUS.md).
+
+Design, verification and roadmap live in [`docs/automation/`](docs/automation/).
 
 ## Develop
 

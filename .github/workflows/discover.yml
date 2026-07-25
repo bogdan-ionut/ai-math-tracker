@@ -151,7 +151,21 @@ jobs:
 
           Automated collection. Curated results.json is untouched by design;
           candidates are proposals and are never promoted automatically."
-          git push
+
+          # A human push between checkout and here would make a bare push a
+          # non-fast-forward and lose the day's run. Rebase onto whatever landed
+          # and retry; our commit only touches data/automation, so a rebase
+          # cannot conflict with curated edits.
+          for attempt in 1 2 3; do
+            if git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              echo "pushed on attempt ${attempt}"
+              exit 0
+            fi
+            echo "::warning::push attempt ${attempt} failed; retrying"
+            sleep $((attempt * 5))
+          done
+          echo "::error::could not push after 3 attempts — the run's data was not saved"
+          exit 1
 
       - name: Restore working tree when not committing
         if: always() && steps.changes.outputs.commit != 'true'

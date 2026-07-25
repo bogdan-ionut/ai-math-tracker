@@ -15,8 +15,8 @@ further defects in the judge stage.
 | 3 | Entity matching and shortlist | **completed** |
 | 4 | Safe merge engine and review queue | **completed** |
 | 5 | Scheduled GitHub Actions workflow | **completed** |
-| **5.1** | **Truthfulness and CI** | **planned — next** |
-| **5.2** | **Make the judge actually decide** | planned |
+| **5.1** | **Truthfulness and CI** | **completed** |
+| **5.2** | **Make the judge actually decide** | **planned — next** |
 | **5.3** | **Retrieval correctness** | planned |
 | **5.4** | **Data contracts, cost and identity** | planned |
 | **5.5** | **Real no-write end-to-end → gate to live writes** | planned |
@@ -46,7 +46,7 @@ The review proposed *correctness → CI → multi-source*. Three adjustments:
 
 ---
 
-## Sprint 5.1 — Truthfulness and CI · `planned`
+## Sprint 5.1 — Truthfulness and CI · `completed`
 
 **Objective.** Stop the repository asserting things that are not true, and make the 232
 tests actually protect the branch.

@@ -65,17 +65,88 @@ class TestVolatileStripping:
         assert _strip_volatile({"a": 1, "b": 2}) == _strip_volatile({"b": 2, "a": 1})
 
 
+@pytest.fixture()
+def repo(tmp_path):
+    """A throwaway git repo shaped like this one.
+
+    These tests used to run against the live working tree, which only passed
+    because the `unexpected` check was unreachable — any uncommitted edit would
+    have broken them. Now that the check works, the logic needs a controlled
+    repository rather than whatever the developer happens to have open.
+    """
+    def git(*args):
+        subprocess.run(["git", *args], cwd=tmp_path, check=True,
+                       capture_output=True, text=True)
+
+    git("init", "-q")
+    git("config", "user.email", "t@example.com")
+    git("config", "user.name", "t")
+    (tmp_path / "data" / "automation").mkdir(parents=True)
+    (tmp_path / "data" / "results.json").write_text('[{"id": "a"}]\n')
+    for name in ("observations.json", "candidates.json", "review_queue.json"):
+        (tmp_path / "data" / "automation" / name).write_text("[]\n")
+    (tmp_path / "data" / "automation" / "processing_state.json").write_text(
+        '{"lastRunAt": "2026-07-25T00:00:00+00:00", "counters": {"runs": 1}}\n')
+    git("add", "-A")
+    git("commit", "-q", "-m", "seed")
+    return tmp_path
+
+
 class TestAssessInRepo:
-    def test_clean_tree_reports_nothing_to_commit(self):
-        rep = assess()
+    def test_clean_tree_reports_nothing_to_commit(self, repo):
+        rep = assess(repo)
         assert rep["shouldCommit"] is False
         assert rep["unexpected"] == []
 
-    def test_assess_shape(self):
-        rep = assess()
+    def test_assess_shape(self, repo):
+        rep = assess(repo)
         for key in ("changed", "substantive", "incidental", "unexpected",
                     "shouldCommit", "reason"):
             assert key in rep
+
+    def test_substantive_change_triggers_a_commit(self, repo):
+        (repo / "data" / "automation" / "candidates.json").write_text(
+            '[{"id": "cand_1", "canonicalName": "X"}]\n')
+        rep = assess(repo)
+        assert rep["shouldCommit"] is True
+        assert "data/automation/candidates.json" in rep["substantive"]
+
+    def test_timestamp_only_change_does_not_trigger_a_commit(self, repo):
+        (repo / "data" / "automation" / "processing_state.json").write_text(
+            '{"lastRunAt": "2026-07-26T09:00:00+00:00", "counters": {"runs": 1}}\n')
+        rep = assess(repo)
+        assert rep["shouldCommit"] is False
+        assert rep["unexpected"] == []
+
+    def test_counter_change_alone_still_does_not_commit(self, repo):
+        """Counters move without anything substantive happening."""
+        (repo / "data" / "automation" / "processing_state.json").write_text(
+            '{"lastRunAt": "2026-07-26T09:00:00+00:00", "counters": {"runs": 2}}\n')
+        assert assess(repo)["shouldCommit"] is False
+
+    def test_touching_the_curated_registry_is_flagged(self, repo):
+        """The check this whole function exists for. It was unreachable before:
+        git status was scoped to data/automation, then filtered for paths NOT
+        under data/automation, so the list could never be non-empty."""
+        (repo / "data" / "results.json").write_text('[{"id": "a", "impact": 5}]\n')
+        rep = assess(repo)
+        assert "data/results.json" in rep["unexpected"]
+
+    def test_stray_source_edit_is_flagged(self, repo):
+        (repo / "rogue.py").write_text("print('hi')\n")
+        assert "rogue.py" in assess(repo)["unexpected"]
+
+    def test_run_artifacts_at_root_are_not_flagged(self, repo):
+        """A run writes these and uploads them; they are not evidence of a
+        run touching something it should not."""
+        for name in ("ingest.json", "extract.json", "pipeline.json"):
+            (repo / name).write_text("{}\n")
+        assert assess(repo)["unexpected"] == []
+
+    def test_new_automation_file_is_substantive(self, repo):
+        (repo / "data" / "automation" / "aliases.json").write_text('{"byAlias": {}}\n')
+        rep = assess(repo)
+        assert rep["shouldCommit"] is True
 
 
 # ---------------------------------------------------------------- workflow topology
@@ -223,3 +294,47 @@ class TestTerminalFailures:
         with pytest.raises(GeminiError):
             c.generate_json("p", {})
         assert calls["n"] == 1
+
+
+class TestCiWorkflow:
+    """CI is what turns the suite from documentation into protection."""
+
+    @pytest.fixture(scope="class")
+    def ci(self):
+        return load_wf(WORKFLOWS / "ci.yml")
+
+    def test_runs_on_push_and_pull_request(self, ci):
+        on = ci[True] if True in ci else ci["on"]
+        assert "push" in on and "pull_request" in on
+
+    def test_runs_pytest(self):
+        assert "pytest" in (WORKFLOWS / "ci.yml").read_text()
+
+    def test_needs_no_secrets(self, ci):
+        """The suite must stay runnable by a contributor with no keys."""
+        blob = (WORKFLOWS / "ci.yml").read_text()
+        assert "secrets." not in blob, "CI must not depend on repository secrets"
+
+    def test_is_read_only(self, ci):
+        assert ci["permissions"]["contents"] == "read"
+
+    def test_asserts_build_does_not_touch_the_registry(self):
+        assert "data/results.json" in (WORKFLOWS / "ci.yml").read_text()
+
+    def test_has_a_guardrail_job(self, ci):
+        assert "guardrails" in ci["jobs"]
+
+
+class TestPushSafety:
+    def test_push_rebases_before_retrying(self):
+        blob = DISCOVER.read_text()
+        assert "pull --rebase" in blob, (
+            "a human push between checkout and push would otherwise lose the run"
+        )
+
+    def test_push_is_bounded(self):
+        blob = DISCOVER.read_text()
+        assert "for attempt in" in blob and "exit 1" in blob
+
+    def test_push_failure_is_loud(self):
+        assert "could not push after 3 attempts" in DISCOVER.read_text()

@@ -1,0 +1,134 @@
+name: CI
+
+# Runs on every push and pull request. Until this existed the 232 tests were
+# documentation rather than protection — nothing stopped a red suite from
+# reaching main. No secrets are used: the whole suite runs offline by design.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python — tests, data pipeline, calibration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements-dev.txt
+
+      - name: Assert the suite needs no credentials
+        env:
+          TWITTERAPI_IO_KEY: ""
+          GEMINI_API_KEY: ""
+        run: |
+          # Deliberately blank. If a test starts requiring a real key, it will
+          # fail here rather than silently becoming un-runnable for contributors.
+          python -m pytest -q
+
+      - name: Curated data pipeline still valid
+        run: python scripts/build_data.py
+
+      - name: Curated registry is unchanged by the build
+        run: |
+          if ! git diff --quiet -- data/results.json; then
+            echo "::error::build_data.py modified data/results.json — it must be read-only"
+            git diff --stat -- data/results.json
+            exit 1
+          fi
+          echo "data/results.json untouched by the build"
+
+      - name: Query calibration
+        run: |
+          python -m scripts.automation.calibrate | tee calibration.txt
+          {
+            echo "### Query calibration"
+            echo ""
+            echo '```'
+            cat calibration.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        # Gating lives in tests/automation/test_query_strategy.py — recall must stay
+        # complete and the noise rate is a ratchet. This step is for visibility.
+
+      - name: Generated frontend data parses
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          bad = []
+          for p in sorted(pathlib.Path("public/data").glob("*.json")):
+              try:
+                  json.loads(p.read_text())
+              except Exception as exc:
+                  bad.append(f"{p}: {exc}")
+          if bad:
+              print("::error::invalid JSON: " + "; ".join(bad)); sys.exit(1)
+          print("all public/data JSON parses")
+          PY
+
+  frontend:
+    name: Frontend — typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the dataset the frontend reads
+        run: |
+          pip install -r scripts/requirements.txt
+          python scripts/build_data.py
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck and build
+        run: pnpm build
+
+  guardrails:
+    name: Guardrails — the promises this project makes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements-dev.txt
+
+      - name: Automation cannot write the curated registry
+        run: python -m pytest -q tests/automation/test_merge.py -k "registry or Registry or audited or editorial"
+
+      - name: No workflow other than the collector may write contents
+        run: python -m pytest -q tests/automation/test_schedule.py -k "TestWorkflowTopology or TestWorkflowInventory"
+
+      - name: Config contains no credentials
+        run: python -m pytest -q tests/automation/test_ingest.py -k "secrets"

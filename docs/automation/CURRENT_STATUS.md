@@ -5,8 +5,8 @@
 > this file never accumulates meaningless daily diffs.
 
 **Last updated:** 2026-07-25
-**Phase:** post-review re-planning · **no implementation in progress**
-**Next sprint:** 5.1 — Truthfulness and CI
+**Phase:** executing the revised plan
+**Next sprint:** 5.2 — Make the judge actually decide
 **Live writes:** 🔴 **disabled** (`dryRunOnSchedule: true`) — gate is Sprint 5.5
 
 ---
@@ -62,13 +62,13 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | **R11** | Unfair per-run cap; overflow counted, not queued | 🟠 major | 5.3 |
 | **K10** | Six of fourteen live queries returned zero; cause unknown (not length) | 🟠 major | 5.3 |
 | **R6** | Corroboration accepts a bare GitHub link | 🟠 major | 6 |
-| **R7** | No CI runs the tests | 🟠 major | 5.1 |
-| **R15** | Bot `git push` has no rebase/retry | 🟠 major | 5.1 |
-| **R12** | `changes.py` "unexpected" check is unreachable code | 🟡 minor | 5.1 |
-| **R13** | README claims there is no automated scraper | 🟡 minor | 5.1 |
+| ~~R7~~ | ~~No CI runs the tests~~ | ✅ | closed 5.1 |
+| ~~R15~~ | ~~Bot push has no rebase/retry~~ | ✅ | closed 5.1 |
+| ~~R12~~ | ~~`changes.py` unexpected check unreachable~~ | ✅ | closed 5.1 |
+| ~~R13~~ | ~~README claims there is no scraper~~ | ✅ | closed 5.1 |
 | **R10** | `storeTweetText: true` commits third-party text | 🟡 minor | 5.4 |
 | **R8** | No curator workflow | 🟡 minor | 6.5 |
-| **K11** | TwitterAPI.io out of credit (HTTP 402) | 🚧 blocker | user |
+| ~~K11~~ | ~~TwitterAPI.io out of credit~~ | ✅ | topped up 2026-07-25 |
 | **K6** | Only 13/40 curated records carry a source URL | 🟡 minor | human backfill |
 | **K8** | `teorth` / `erdosproblems` handles unconfirmed | 🟡 minor | opportunistic |
 | **K9** | Gold set fitted to known wordings — 100% recall is a floor, not proof | ℹ️ noted | ongoing |
@@ -95,7 +95,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 |---|---|---|
 | ✅ U1/U2 | Repository secrets added | done |
 | ✅ U3 | Actions workflow permissions set to read/write | done |
-| **U7** | **Top up the TwitterAPI.io account** (HTTP 402) | before Sprint 5.3 can be validated |
+| ✅ U7 | TwitterAPI.io topped up | done 2026-07-25 |
 | U6 | After Sprint 5.5: read three real no-write runs, then flip `dryRunOnSchedule` | the gate |
 | U8 | *(optional)* Confirm the correct `teorth` / `erdosproblems` handles by hand | opportunistic |
 
@@ -103,22 +103,41 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 232 / 232 (`python -m pytest`) — no network, no API keys.
-**Gating merges:** none yet — that is Sprint 5.1.
+**Passing:** 248 / 248 (`python -m pytest`) — no network, no API keys.
+**Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Known coverage gap:** the judge path is never exercised end to end. `test_merge.outcome()`
 defaults to a deterministic identifier match, which is precisely why A1–A4 survived.
 **Build health:** `build_data.py` ✅ · `pnpm build` ✅ · live site ✅ · registry untouched ✅
 
 ---
 
+## Completed since the re-plan
+
+### Sprint 5.1 — Truthfulness and CI ✅
+
+- **`ci.yml`** on push and pull request: pytest (with keys explicitly blanked, so a test
+  that starts needing credentials fails loudly rather than becoming un-runnable),
+  `build_data.py`, an assertion that the build does not touch the registry, calibration,
+  and `pnpm build`. A third `guardrails` job re-runs the promises this project makes.
+- **README corrected.** It claimed "there is deliberately no automated scraper"; there is
+  one. Replaced with an honest two-layer table and the measured corroboration base rate.
+- **`changes.py` unexpected check made reachable.** It scoped `git status` to
+  `data/automation`, then filtered for paths *outside* it — a set that could never be
+  non-empty. Now unscoped, with run artifacts allow-listed.
+- **Bot push rebases and retries.** A human push between checkout and push would previously
+  make it a non-fast-forward and lose the day's run.
+- 16 new tests (**248 total**), including one that fails if `data/results.json` is touched
+  mid-run — the check that was dead before.
+
+> The tests for `changes.py` used to run against the live working tree and only passed
+> *because* the check was dead: any uncommitted edit would have broken them. They now build
+> a throwaway git repo and assert the logic.
+
+---
+
 ## Next task
 
-**Sprint 5.1 — Truthfulness and CI.** In order:
-
-1. `.github/workflows/ci.yml` — pytest, `build_data.py`, `pnpm build`, calibration, on push
-   and pull request.
-2. README: remove the "no automated scraper" claim; describe the curated/automated split.
-3. `changes.py`: make the `unexpected` check reachable (unscoped `git status`, then filter).
-4. `discover.yml`: `git pull --rebase` with bounded retry before push.
-
-Then 5.2 (the judge), which is the largest correctness gain per line changed.
+**Sprint 5.2 — Make the judge actually decide.** The largest correctness gain per line
+changed: A1–A5 in the defect table. Start with `tests/automation/test_judge.py`, because the
+existing `outcome()` helper defaults to a deterministic identifier match and that is exactly
+why these defects survived.
