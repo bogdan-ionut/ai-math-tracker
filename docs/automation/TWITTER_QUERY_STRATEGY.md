@@ -174,34 +174,68 @@ classifier**. Excluding them by keyword would cost real signal — `-counterexam
 
 ---
 
-## 5b. First live run — six queries returned nothing (unresolved)
+## 5b. K10 — six queries return zero, reproducibly (cause still unknown)
 
-The first live dry run (`30156362824`) collected **37 tweets from 14 queries**, but six
-returned **exactly zero**:
+**Status: reproduced, narrowed, not solved.**
 
-| Returned 20 | Returned 0 |
+Two live dry runs on separate days, both with working API credit
+(`30156362824`, `30173575305`), returned **the same six queries at exactly zero**:
+
+| Returns results | Returns 0 (both runs) |
 |---|---|
-| `broad-recall`, `problem-registries`, `arxiv-linked`, `account-*` | `explicit-ai-solution`, `academic-announcement`, `formal-verification`, `disputes-and-corrections`, `artifact-release`, `named-systems` |
+| `problem-registries` 20 · `arxiv-linked` 20 · `broad-recall` 20 · `account-*` 5–20 | `explicit-ai-solution` · `academic-announcement` · `formal-verification` · `disputes-and-corrections` · `artifact-release` · `named-systems` |
 
-**My first hypothesis was query length, and it is not supported.** A bisecting probe
-(`probe-length.yml`) found a 462-character query returning results while a 417-character one
-returned none — inconsistent with a length cutoff. The Sprint 1.5 probe had reported a
-788-char query as `ACCEPTED returned=0`; I recorded "length is not a constraint" because
-there was no error, when the zero was the part worth investigating.
+Identical results across both runs except `account-GoogleDeepMind` (6 → 8), which is just
+new posts. **This is structural, not flakiness.**
 
-**The likeliest remaining explanation is that these queries are simply restrictive.**
-Each demands a rare conjunction inside a ~30-hour window — a tweet containing *"verified in
-Lean"* **and** an AI system name, or *"we prove"* **and** a mathematical object **and** an AI
-term. Zero on a quiet day may well be the correct answer, not a bug.
+### What has been ruled out
 
-**This is unresolved.** The probe that would settle it hit `HTTP 402` — the TwitterAPI.io
-account ran out of credit mid-run. Once credit is restored, re-run **Probe — query length
-limit**; if long queries return results there, restrictiveness is confirmed and no change is
-needed. If they do not, the builder must split families into narrower queries.
+**Query length — definitively.** A bisecting probe (`probe-length.yml`, run `30173530836`)
+walked one real query down from 462 to 67 characters:
 
-Until then the high-precision families are **not proven to work in production**, and the
-corroborated observations we do get come from `problem-registries`, `arxiv-linked` and the
-account queries.
+```
+chars   ai  obj   returned
+  462   22    9         20
+  417   18    9          0     ← the only zero
+  383   14    9         20
+  339 … 67                20   (all)
+```
+
+A 462-character query returns results while a 417-character one returns none, and
+everything shorter returns results. There is no length cutoff. The Sprint 1.5 probe had
+reported an 788-char query as `ACCEPTED returned=0` and I recorded "length is not a
+constraint" — the *accepted* half was right, but I should have investigated the zero
+instead of attributing it to nonsense test terms.
+
+**Simple OR-term count — also ruled out.** The eight working queries carry ≤ 28 OR-terms and
+the six failing ones ≥ 31, which looks like a clean split, but the length probe contradicts
+it: a 31-term query returned 20 while a 27-term one returned 0. Whatever the boundary is, it
+is not a plain term count.
+
+### What is still consistent with the evidence
+
+The six failing queries all demand a **conjunction of three or more independent concept
+groups**, or a group made almost entirely of quoted multi-word phrases. The four working
+ones are either two loose groups, an account filter, or anchored by `url:`. That may mean
+they are genuinely restrictive — a post containing *"verified in Lean"* **and** a named AI
+system inside the searchable window may simply not exist — or it may mean the backend
+silently degrades on certain query shapes.
+
+**The two are distinguishable, and Sprint 5.3 must distinguish them** before the shapes are
+trusted. The experiment is a *differential* probe: take one failing query verbatim and
+remove one element at a time (drop a group, unquote a phrase, shorten a cluster) until it
+starts returning results. That isolates the responsible element rather than testing a
+hypothesis about it.
+
+### Consequence today
+
+The high-precision families — including `disputes-and-corrections`, the one added
+specifically because both `disputed` records in this dataset are dispute signals — **are
+returning nothing in production**. Everything currently collected comes from
+`problem-registries`, `arxiv-linked`, `broad-recall` and the trusted accounts.
+
+Measured corroboration across both runs: **3/20 and 4/35 — 11–15%**. The external-reference
+gate is doing most of the filtering, exactly as designed.
 
 ## 6. Telemetry
 

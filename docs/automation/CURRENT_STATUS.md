@@ -60,7 +60,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | **R3** | `review` observations re-extracted daily (wasted Gemini) | 🟠 major | 5.4 |
 | **R4** | Pydantic models do not validate persisted files | 🟠 major | 5.4 |
 | **R11** | Unfair per-run cap; overflow counted, not queued | 🟠 major | 5.3 |
-| **K10** | Six of fourteen live queries returned zero; cause unknown (not length) | 🟠 major | 5.3 |
+| **K10** | Six of fourteen queries return zero — **reproduced twice**; length and term-count ruled out, cause still unknown | 🟠 major | 5.3 |
 | **R6** | Corroboration accepts a bare GitHub link | 🟠 major | 6 |
 | ~~R7~~ | ~~No CI runs the tests~~ | ✅ | closed 5.1 |
 | ~~R15~~ | ~~Bot push has no rebase/retry~~ | ✅ | closed 5.1 |
@@ -132,6 +132,20 @@ defaults to a deterministic identifier match, which is precisely why A1–A4 sur
 > The tests for `changes.py` used to run against the live working tree and only passed
 > *because* the check was dead: any uncommitted edit would have broken them. They now build
 > a throwaway git repo and assert the logic.
+
+---
+
+## K10 narrowed (2026-07-25)
+
+Re-measured now that credit is restored. The same six queries return zero on a second run
+days apart — **structural, not transient**. Query length is definitively ruled out (462
+chars works, 417 does not, everything shorter works). A plain OR-term count is ruled out
+too. The failing six all demand three-or-more concept groups or an all-quoted-phrase group;
+whether that makes them genuinely restrictive or trips a backend limit is the question
+Sprint 5.3 opens with, using a differential probe that strips one element at a time.
+
+Consequence worth stating: `disputes-and-corrections` — added precisely because both
+`disputed` records here are dispute signals — is currently returning nothing in production.
 
 ---
 
