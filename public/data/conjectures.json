@@ -17,6 +17,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#1044",
+    "aliases": [
+      "Erdos #1044",
+      "Erdos problem 1044",
+      "Erdős #1044",
+      "Erdős problem 1044",
+      "erdos #1044",
+      "erdosproblems.com/1044"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1044"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -48,6 +61,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#281",
+    "aliases": [
+      "Erdos #281",
+      "Erdos problem 281",
+      "Erdős #281",
+      "Erdős problem 281",
+      "erdos #281",
+      "erdosproblems.com/281"
+    ],
+    "externalIds": {
+      "erdos": [
+        "281"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -79,6 +105,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#728",
+    "aliases": [
+      "Erdos #728",
+      "Erdos problem 728",
+      "Erdős #728",
+      "Erdős problem 728",
+      "erdos #728",
+      "erdosproblems.com/728"
+    ],
+    "externalIds": {
+      "erdos": [
+        "728"
+      ]
+    },
     "sources": [
       "https://maa.org/math-values/ai-solves-an-80-year-old-erdos-problem/"
     ],
@@ -112,6 +151,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#729",
+    "aliases": [
+      "Erdos #729",
+      "Erdos problem 729",
+      "Erdős #729",
+      "Erdős problem 729",
+      "erdos #729",
+      "erdosproblems.com/729"
+    ],
+    "externalIds": {
+      "erdos": [
+        "729"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -143,6 +195,22 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#652",
+    "aliases": [
+      "Erdos #652",
+      "Erdos problem 652",
+      "Erdős #652",
+      "Erdős problem 652",
+      "erdos #652",
+      "erdosproblems.com/652"
+    ],
+    "externalIds": {
+      "erdos": [
+        "652"
+      ],
+      "github": [
+        "teorth/erdosproblems"
+      ]
+    },
     "sources": [
       "https://www.erdosproblems.com/652",
       "https://github.com/teorth/erdosproblems/wiki/AI-contributions-to-Erd%C5%91s-problems"
@@ -177,6 +245,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#397",
+    "aliases": [
+      "Erdos #397",
+      "Erdos problem 397",
+      "Erdős #397",
+      "Erdős problem 397",
+      "erdos #397",
+      "erdosproblems.com/397"
+    ],
+    "externalIds": {
+      "erdos": [
+        "397"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -208,6 +289,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#1051",
+    "aliases": [
+      "Erdos #1051",
+      "Erdos problem 1051",
+      "Erdős #1051",
+      "Erdős problem 1051",
+      "erdos #1051",
+      "erdosproblems.com/1051"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1051"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -239,6 +333,11 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Dead ends in square-free digit walks",
+      "dead ends in square free digit walks"
+    ],
+    "externalIds": {},
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -270,6 +369,11 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Fel’s conjecture",
+      "fel s conjecture"
+    ],
+    "externalIds": {},
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -301,6 +405,11 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Chen–Gendron conjecture",
+      "chen gendron conjecture"
+    ],
+    "externalIds": {},
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -332,6 +441,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#457",
+    "aliases": [
+      "Erdos #457",
+      "Erdos problem 457",
+      "Erdős #457",
+      "Erdős problem 457",
+      "erdos #457",
+      "erdosproblems.com/457"
+    ],
+    "externalIds": {
+      "erdos": [
+        "457"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -363,6 +485,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#369",
+    "aliases": [
+      "Erdos #369",
+      "Erdos problem 369",
+      "Erdős #369",
+      "Erdős problem 369",
+      "erdos #369",
+      "erdosproblems.com/369"
+    ],
+    "externalIds": {
+      "erdos": [
+        "369"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -394,6 +529,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#1202",
+    "aliases": [
+      "Erdos #1202",
+      "Erdos problem 1202",
+      "Erdős #1202",
+      "Erdős problem 1202",
+      "erdos #1202",
+      "erdosproblems.com/1202"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1202"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -425,6 +573,18 @@
     "isOpenProblem": true,
     "yearsOpen": 12,
     "erdosNumber": null,
+    "aliases": [
+      "Anderson's quasi-complete local-ring problem",
+      "anderson s quasi complete local ring problem"
+    ],
+    "externalIds": {
+      "arxiv": [
+        "2604.03789"
+      ],
+      "github": [
+        "frenzymath/anderson-conjecture"
+      ]
+    },
     "sources": [
       "https://arxiv.org/abs/2604.03789",
       "https://github.com/frenzymath/Anderson-Conjecture"
@@ -465,6 +625,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Erdős #960, #987, #990, #1091, #1141",
+      "erdos #960 #987 #990 #1091 #1141"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1091",
+        "1141",
+        "960",
+        "987",
+        "990"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -496,6 +669,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#1196",
+    "aliases": [
+      "Erdos #1196",
+      "Erdos problem 1196",
+      "Erdős #1196",
+      "Erdős problem 1196",
+      "erdos #1196",
+      "erdosproblems.com/1196"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1196"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -527,6 +713,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#1217",
+    "aliases": [
+      "Erdos #1217",
+      "Erdos problem 1217",
+      "Erdős #1217",
+      "Erdős problem 1217",
+      "erdos #1217",
+      "erdosproblems.com/1217"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1217"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -558,6 +757,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#1041",
+    "aliases": [
+      "Erdos #1041",
+      "Erdos problem 1041",
+      "Erdős #1041",
+      "Erdős problem 1041",
+      "erdos #1041",
+      "erdosproblems.com/1041"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1041"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -589,6 +801,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#1014",
+    "aliases": [
+      "Erdos #1014",
+      "Erdos problem 1014",
+      "Erdős #1014",
+      "Erdős problem 1014",
+      "erdos #1014",
+      "erdosproblems.com/1014"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1014"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -620,6 +845,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#38",
+    "aliases": [
+      "Erdos #38",
+      "Erdos problem 38",
+      "Erdős #38",
+      "Erdős problem 38",
+      "erdos #38",
+      "erdosproblems.com/38"
+    ],
+    "externalIds": {
+      "erdos": [
+        "38"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -651,6 +889,21 @@
     "isOpenProblem": true,
     "yearsOpen": 80,
     "erdosNumber": "#90",
+    "aliases": [
+      "Erdos #90",
+      "Erdos problem 90",
+      "Erdős #90",
+      "Erdős problem 90",
+      "Unit-distance conjecture",
+      "Unit-distance conjecture (Erdős #90, 1946)",
+      "erdosproblems.com/90",
+      "unit distance conjecture erdos #90 1946"
+    ],
+    "externalIds": {
+      "erdos": [
+        "90"
+      ]
+    },
     "sources": [
       "https://www.scientificamerican.com/article/ai-just-solved-an-80-year-old-erdos-problem-and-mathematicians-are-amazed/"
     ],
@@ -692,6 +945,21 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "AlphaProof Nexus — 7 Erdős problems",
+      "alphaproof nexus 7 erdos problems"
+    ],
+    "externalIds": {
+      "erdos": [
+        "12",
+        "125",
+        "138",
+        "152",
+        "26",
+        "741",
+        "846"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -723,6 +991,11 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "AlphaProof Nexus — 44 OEIS conjectures",
+      "alphaproof nexus 44 oeis conjectures"
+    ],
+    "externalIds": {},
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -754,6 +1027,21 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Cycle Double Cover conjecture",
+      "cycle double cover conjecture"
+    ],
+    "externalIds": {
+      "arxiv": [
+        "2607.16356"
+      ],
+      "github": [
+        "openai/cdc-lean"
+      ],
+      "lean": [
+        "openai/cdc-lean"
+      ]
+    },
     "sources": [
       "https://cdn.openai.com/pdf/04d1d1e4-bc75-476a-97cf-49055cd98d31/cdc_proof.pdf",
       "https://github.com/openai/cdc-lean",
@@ -790,6 +1078,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#793",
+    "aliases": [
+      "Erdos #793",
+      "Erdos problem 793",
+      "Erdős #793",
+      "Erdős problem 793",
+      "erdos #793",
+      "erdosproblems.com/793"
+    ],
+    "externalIds": {
+      "erdos": [
+        "793"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -848,6 +1149,40 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "star fleet batch",
+      "“Star Fleet” batch"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1183",
+        "1186",
+        "1188",
+        "1189",
+        "123",
+        "129",
+        "130",
+        "254",
+        "267",
+        "320",
+        "321",
+        "336",
+        "394",
+        "415",
+        "450",
+        "489",
+        "521",
+        "522",
+        "538",
+        "584",
+        "638",
+        "662",
+        "709",
+        "769",
+        "796",
+        "959"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -879,6 +1214,12 @@
     "isOpenProblem": true,
     "yearsOpen": 87,
     "erdosNumber": null,
+    "aliases": [
+      "Jacobian conjecture",
+      "Jacobian conjecture (1939)",
+      "jacobian conjecture 1939"
+    ],
+    "externalIds": {},
     "sources": [
       "https://xenaproject.wordpress.com/2026/07/20/human-mathematicians-are-being-outcounterexampled/",
       "https://fortune.com/2026/07/21/ai-solves-jacobian-conjecture-levant-alpoge-claude-fable-5/"
@@ -913,6 +1254,11 @@
     "isOpenProblem": true,
     "yearsOpen": 29,
     "erdosNumber": null,
+    "aliases": [
+      "Dinitz–Garg–Goemans conjecture",
+      "dinitz garg goemans conjecture"
+    ],
+    "externalIds": {},
     "sources": [
       "https://digg.com/tech/yg49xzrx"
     ],
@@ -953,6 +1299,20 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Erdős #390, #486, #536, #788, #1002, #1038",
+      "erdos #390 #486 #536 #788 #1002 #1038"
+    ],
+    "externalIds": {
+      "erdos": [
+        "1002",
+        "1038",
+        "390",
+        "486",
+        "536",
+        "788"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -984,6 +1344,19 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": "#690",
+    "aliases": [
+      "Erdos #690",
+      "Erdos problem 690",
+      "Erdős #690",
+      "Erdős problem 690",
+      "erdos #690",
+      "erdosproblems.com/690"
+    ],
+    "externalIds": {
+      "erdos": [
+        "690"
+      ]
+    },
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -1015,6 +1388,11 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Two-dimensional Gaussian moments conjecture",
+      "two dimensional gaussian moments conjecture"
+    ],
+    "externalIds": {},
     "sources": [
       "https://x.com/octonion/status/2079183963382284288"
     ],
@@ -1048,6 +1426,11 @@
     "isOpenProblem": false,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Alleged “Röll conjecture”",
+      "alleged roll conjecture"
+    ],
+    "externalIds": {},
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -1079,6 +1462,11 @@
     "isOpenProblem": true,
     "yearsOpen": 20,
     "erdosNumber": null,
+    "aliases": [
+      "Brandt’s Regular Supergraph Problem",
+      "brandt s regular supergraph problem"
+    ],
+    "externalIds": {},
     "sources": [
       "https://x.com/imjaredz/status/2080088344424583261"
     ],
@@ -1112,6 +1500,11 @@
     "isOpenProblem": true,
     "yearsOpen": 40,
     "erdosNumber": null,
+    "aliases": [
+      "Graffiti Conjecture 154",
+      "graffiti conjecture 154"
+    ],
+    "externalIds": {},
     "sources": [
       "https://x.com/imjaredz/status/2080088344424583261"
     ],
@@ -1145,6 +1538,11 @@
     "isOpenProblem": true,
     "yearsOpen": 30,
     "erdosNumber": null,
+    "aliases": [
+      "Graffiti Conjecture 284",
+      "graffiti conjecture 284"
+    ],
+    "externalIds": {},
     "sources": [
       "https://www.basenor.com/blogs/news/grok-4-5-cracks-30-year-old-graph-theory-conjecture-musk-says"
     ],
@@ -1178,6 +1576,11 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Graffiti Conjecture 39",
+      "graffiti conjecture 39"
+    ],
+    "externalIds": {},
     "sources": [
       "https://x.com/imjaredz/status/2080088344424583261"
     ],
@@ -1211,6 +1614,11 @@
     "isOpenProblem": true,
     "yearsOpen": null,
     "erdosNumber": null,
+    "aliases": [
+      "Graffiti Conjecture 40",
+      "graffiti conjecture 40"
+    ],
+    "externalIds": {},
     "sources": [
       "https://x.com/imjaredz/status/2080088344424583261"
     ],
@@ -1244,6 +1652,11 @@
     "isOpenProblem": true,
     "yearsOpen": 21,
     "erdosNumber": null,
+    "aliases": [
+      "Graffiti.pc Conjecture 174",
+      "graffiti pc conjecture 174"
+    ],
+    "externalIds": {},
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -1275,6 +1688,12 @@
     "isOpenProblem": true,
     "yearsOpen": 46,
     "erdosNumber": null,
+    "aliases": [
+      "Erdős–Graham conjecture",
+      "Erdős–Graham conjecture (1980)",
+      "erdos graham conjecture 1980"
+    ],
+    "externalIds": {},
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,
@@ -1306,6 +1725,11 @@
     "isOpenProblem": true,
     "yearsOpen": 22,
     "erdosNumber": null,
+    "aliases": [
+      "Written on the Wall II Conjecture 91",
+      "written wall ii conjecture 91"
+    ],
+    "externalIds": {},
     "sources": [],
     "paperUrl": null,
     "artifactUrl": null,

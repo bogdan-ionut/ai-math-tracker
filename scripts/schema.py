@@ -74,6 +74,11 @@ class MathematicalResult(BaseModel):
     years_open: Optional[int] = Field(default=None, alias="yearsOpen", ge=0)
     erdos_number: Optional[str] = Field(default=None, alias="erdosNumber")
 
+    # Additive matching aids, derived by scripts/backfill_identifiers.py from
+    # fields already present. Never written by the automation pipeline.
+    aliases: list[str] = Field(default_factory=list)
+    external_ids: dict[str, list[str]] = Field(default_factory=dict, alias="externalIds")
+
     sources: list[HttpUrl] = Field(default_factory=list)
     paper_url: Optional[HttpUrl] = Field(default=None, alias="paperUrl")
     artifact_url: Optional[HttpUrl] = Field(default=None, alias="artifactUrl")

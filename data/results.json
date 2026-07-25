@@ -22,7 +22,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1044"
+      ]
+    },
+    "aliases": [
+      "Erdos #1044",
+      "Erdos problem 1044",
+      "Erdős #1044",
+      "Erdős problem 1044",
+      "erdos #1044",
+      "erdosproblems.com/1044"
+    ]
   },
   {
     "id": "erdos-281",
@@ -47,7 +60,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "281"
+      ]
+    },
+    "aliases": [
+      "Erdos #281",
+      "Erdos problem 281",
+      "Erdős #281",
+      "Erdős problem 281",
+      "erdos #281",
+      "erdosproblems.com/281"
+    ]
   },
   {
     "id": "erdos-728",
@@ -74,7 +100,20 @@
     "impact": 3,
     "resolution": "Proof",
     "assessment": "Resolves the intended nontrivial factorial-divisibility problem after clarifying an ambiguous formulation. Important but specialized.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "728"
+      ]
+    },
+    "aliases": [
+      "Erdos #728",
+      "Erdos problem 728",
+      "Erdős #728",
+      "Erdős problem 728",
+      "erdos #728",
+      "erdosproblems.com/728"
+    ]
   },
   {
     "id": "erdos-729",
@@ -99,7 +138,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "729"
+      ]
+    },
+    "aliases": [
+      "Erdos #729",
+      "Erdos problem 729",
+      "Erdős #729",
+      "Erdős problem 729",
+      "erdos #729",
+      "erdosproblems.com/729"
+    ]
   },
   {
     "id": "erdos-397",
@@ -124,7 +176,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "397"
+      ]
+    },
+    "aliases": [
+      "Erdos #397",
+      "Erdos problem 397",
+      "Erdős #397",
+      "Erdős problem 397",
+      "erdos #397",
+      "erdosproblems.com/397"
+    ]
   },
   {
     "id": "erdos-1051",
@@ -149,7 +214,20 @@
     "impact": 3,
     "resolution": "Proof",
     "assessment": "Settles a longstanding irrationality question for rapidly growing sequences and led to formalization and generalization.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1051"
+      ]
+    },
+    "aliases": [
+      "Erdos #1051",
+      "Erdos problem 1051",
+      "Erdős #1051",
+      "Erdős problem 1051",
+      "erdos #1051",
+      "erdosproblems.com/1051"
+    ]
   },
   {
     "id": "erdos-652",
@@ -177,7 +255,23 @@
     "impact": 2,
     "resolution": "Proof",
     "assessment": "Correctly closes the listed problem, but the final argument is essentially an application of an existing incidence theorem rather than a new theorem.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "652"
+      ],
+      "github": [
+        "teorth/erdosproblems"
+      ]
+    },
+    "aliases": [
+      "Erdos #652",
+      "Erdos problem 652",
+      "Erdős #652",
+      "Erdős problem 652",
+      "erdos #652",
+      "erdosproblems.com/652"
+    ]
   },
   {
     "id": "fel-s-conjecture",
@@ -202,7 +296,12 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Fel’s conjecture",
+      "fel s conjecture"
+    ]
   },
   {
     "id": "dead-ends-in-square-free-digit-walks",
@@ -227,7 +326,12 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Dead ends in square-free digit walks",
+      "dead ends in square free digit walks"
+    ]
   },
   {
     "id": "chen-gendron-conjecture",
@@ -252,7 +356,12 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Chen–Gendron conjecture",
+      "chen gendron conjecture"
+    ]
   },
   {
     "id": "erdos-457",
@@ -277,7 +386,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "457"
+      ]
+    },
+    "aliases": [
+      "Erdos #457",
+      "Erdos problem 457",
+      "Erdős #457",
+      "Erdős problem 457",
+      "erdos #457",
+      "erdosproblems.com/457"
+    ]
   },
   {
     "id": "erdos-369",
@@ -302,7 +424,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "369"
+      ]
+    },
+    "aliases": [
+      "Erdos #369",
+      "Erdos problem 369",
+      "Erdős #369",
+      "Erdős problem 369",
+      "erdos #369",
+      "erdosproblems.com/369"
+    ]
   },
   {
     "id": "erdos-1202",
@@ -327,7 +462,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1202"
+      ]
+    },
+    "aliases": [
+      "Erdos #1202",
+      "Erdos problem 1202",
+      "Erdős #1202",
+      "Erdős problem 1202",
+      "erdos #1202",
+      "erdosproblems.com/1202"
+    ]
   },
   {
     "id": "erdos-960-987-990-1091-1141-batch",
@@ -358,7 +506,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Counterexample",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1091",
+        "1141",
+        "960",
+        "987",
+        "990"
+      ]
+    },
+    "aliases": [
+      "Erdős #960, #987, #990, #1091, #1141",
+      "erdos #960 #987 #990 #1091 #1141"
+    ]
   },
   {
     "id": "erdos-1196",
@@ -383,7 +544,20 @@
     "impact": 4,
     "resolution": "Proof",
     "assessment": "Resolves a 1968 primitive-set conjecture with a sharp asymptotic bound; checked, extended, and formalized in Lean.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1196"
+      ]
+    },
+    "aliases": [
+      "Erdos #1196",
+      "Erdos problem 1196",
+      "Erdős #1196",
+      "Erdős problem 1196",
+      "erdos #1196",
+      "erdosproblems.com/1196"
+    ]
   },
   {
     "id": "erdos-1217",
@@ -408,7 +582,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1217"
+      ]
+    },
+    "aliases": [
+      "Erdos #1217",
+      "Erdos problem 1217",
+      "Erdős #1217",
+      "Erdős problem 1217",
+      "erdos #1217",
+      "erdosproblems.com/1217"
+    ]
   },
   {
     "id": "erdos-1041",
@@ -433,7 +620,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1041"
+      ]
+    },
+    "aliases": [
+      "Erdos #1041",
+      "Erdos problem 1041",
+      "Erdős #1041",
+      "Erdős problem 1041",
+      "erdos #1041",
+      "erdosproblems.com/1041"
+    ]
   },
   {
     "id": "erdos-1014",
@@ -458,7 +658,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1014"
+      ]
+    },
+    "aliases": [
+      "Erdos #1014",
+      "Erdos problem 1014",
+      "Erdős #1014",
+      "Erdős problem 1014",
+      "erdos #1014",
+      "erdosproblems.com/1014"
+    ]
   },
   {
     "id": "erdos-38",
@@ -483,7 +696,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "38"
+      ]
+    },
+    "aliases": [
+      "Erdos #38",
+      "Erdos problem 38",
+      "Erdős #38",
+      "Erdős problem 38",
+      "erdos #38",
+      "erdosproblems.com/38"
+    ]
   },
   {
     "id": "erdos-90",
@@ -510,7 +736,22 @@
     "impact": 5,
     "resolution": "Counterexample",
     "assessment": "Overturns an approximately 80-year-old central belief in discrete geometry and creates an unexpected bridge to algebraic number theory. Independent work has already strengthened it.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "90"
+      ]
+    },
+    "aliases": [
+      "Erdos #90",
+      "Erdos problem 90",
+      "Erdős #90",
+      "Erdős problem 90",
+      "Unit-distance conjecture",
+      "Unit-distance conjecture (Erdős #90, 1946)",
+      "erdosproblems.com/90",
+      "unit distance conjecture erdos #90 1946"
+    ]
   },
   {
     "id": "alphaproof-erdos-7",
@@ -543,7 +784,22 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "12",
+        "125",
+        "138",
+        "152",
+        "26",
+        "741",
+        "846"
+      ]
+    },
+    "aliases": [
+      "AlphaProof Nexus — 7 Erdős problems",
+      "alphaproof nexus 7 erdos problems"
+    ]
   },
   {
     "id": "alphaproof-oeis-44",
@@ -568,7 +824,12 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "AlphaProof Nexus — 44 OEIS conjectures",
+      "alphaproof nexus 44 oeis conjectures"
+    ]
   },
   {
     "id": "cycle-double-cover",
@@ -599,7 +860,22 @@
     "resolution": "Proof",
     "assessment": "Resolves a central, decades-old structural graph-theory conjecture connecting cycles and flows. Very recent, so long-run influence still depends on community uptake.",
     "provenanceNote": null,
-    "leanArtifactUrl": "https://github.com/openai/cdc-lean"
+    "leanArtifactUrl": "https://github.com/openai/cdc-lean",
+    "externalIds": {
+      "arxiv": [
+        "2607.16356"
+      ],
+      "github": [
+        "openai/cdc-lean"
+      ],
+      "lean": [
+        "openai/cdc-lean"
+      ]
+    },
+    "aliases": [
+      "Cycle Double Cover conjecture",
+      "cycle double cover conjecture"
+    ]
   },
   {
     "id": "erdos-793",
@@ -624,7 +900,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "793"
+      ]
+    },
+    "aliases": [
+      "Erdos #793",
+      "Erdos problem 793",
+      "Erdős #793",
+      "Erdős problem 793",
+      "erdos #793",
+      "erdosproblems.com/793"
+    ]
   },
   {
     "id": "star-fleet-26",
@@ -676,7 +965,41 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1183",
+        "1186",
+        "1188",
+        "1189",
+        "123",
+        "129",
+        "130",
+        "254",
+        "267",
+        "320",
+        "321",
+        "336",
+        "394",
+        "415",
+        "450",
+        "489",
+        "521",
+        "522",
+        "538",
+        "584",
+        "638",
+        "662",
+        "709",
+        "769",
+        "796",
+        "959"
+      ]
+    },
+    "aliases": [
+      "star fleet batch",
+      "“Star Fleet” batch"
+    ]
   },
   {
     "id": "jacobian-conjecture-1939",
@@ -704,7 +1027,13 @@
     "impact": 5,
     "resolution": "Counterexample",
     "assessment": "An explicit Keller map refutes the conjecture in every dimension at least three. This fundamentally changes a problem dating to 1939, although dimension two remains open.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Jacobian conjecture",
+      "Jacobian conjecture (1939)",
+      "jacobian conjecture 1939"
+    ]
   },
   {
     "id": "dinitz-garg-goemans-conjecture",
@@ -731,7 +1060,12 @@
     "impact": 4,
     "resolution": "Counterexample",
     "assessment": "Removes a prominent conjectured rounding guarantee in combinatorial optimization and unsplittable-flow theory. Likely to redirect algorithm design.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Dinitz–Garg–Goemans conjecture",
+      "dinitz garg goemans conjecture"
+    ]
   },
   {
     "id": "two-dimensional-gaussian-moments-conjecture",
@@ -758,7 +1092,12 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Two-dimensional Gaussian moments conjecture",
+      "two dimensional gaussian moments conjecture"
+    ]
   },
   {
     "id": "erdos-690",
@@ -783,7 +1122,20 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "690"
+      ]
+    },
+    "aliases": [
+      "Erdos #690",
+      "Erdos problem 690",
+      "Erdős #690",
+      "Erdős problem 690",
+      "erdos #690",
+      "erdosproblems.com/690"
+    ]
   },
   {
     "id": "erdos-390-486-536-788-1002-1038-batch",
@@ -815,7 +1167,21 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {
+      "erdos": [
+        "1002",
+        "1038",
+        "390",
+        "486",
+        "536",
+        "788"
+      ]
+    },
+    "aliases": [
+      "Erdős #390, #486, #536, #788, #1002, #1038",
+      "erdos #390 #486 #536 #788 #1002 #1038"
+    ]
   },
   {
     "id": "graffiti-conjecture-284",
@@ -842,7 +1208,12 @@
     "impact": 2,
     "resolution": "Counterexample",
     "assessment": "An elegant exact use of the Hoffman-Singleton graph, but the target inequality is narrow.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Graffiti Conjecture 284",
+      "graffiti conjecture 284"
+    ]
   },
   {
     "id": "graffiti-conjecture-39",
@@ -869,7 +1240,12 @@
     "impact": 2,
     "resolution": "Proof",
     "assessment": "A clean distance-variance and spectral-interlacing theorem with formal verification; mainly specialist graph theory.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Graffiti Conjecture 39",
+      "graffiti conjecture 39"
+    ]
   },
   {
     "id": "graffiti-conjecture-40",
@@ -896,7 +1272,12 @@
     "impact": 2,
     "resolution": "Proof",
     "assessment": "The negative-spectrum companion to Conjecture 39. Useful, but largely the same mechanism and audience.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Graffiti Conjecture 40",
+      "graffiti conjecture 40"
+    ]
   },
   {
     "id": "brandt-s-regular-supergraph-problem",
@@ -923,7 +1304,12 @@
     "impact": 2,
     "resolution": "Counterexample",
     "assessment": "Exact and interesting, but only refutes the weak boundary formulation; Brandt's stronger strict theorem survives.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Brandt’s Regular Supergraph Problem",
+      "brandt s regular supergraph problem"
+    ]
   },
   {
     "id": "graffiti-pc-conjecture-174",
@@ -948,7 +1334,12 @@
     "impact": null,
     "assessment": null,
     "resolution": "Counterexample",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Graffiti.pc Conjecture 174",
+      "graffiti pc conjecture 174"
+    ]
   },
   {
     "id": "erdos-graham-conjecture-1980",
@@ -973,7 +1364,13 @@
     "impact": null,
     "assessment": null,
     "resolution": "Proof",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Erdős–Graham conjecture",
+      "Erdős–Graham conjecture (1980)",
+      "erdos graham conjecture 1980"
+    ]
   },
   {
     "id": "written-on-the-wall-ii-91",
@@ -998,7 +1395,12 @@
     "impact": 2,
     "resolution": "Counterexample",
     "assessment": "Closes a 2004 generated graph conjecture with a small, exact witness. Mathematically sound but unlikely to reshape the field.",
-    "provenanceNote": null
+    "provenanceNote": null,
+    "externalIds": {},
+    "aliases": [
+      "Written on the Wall II Conjecture 91",
+      "written wall ii conjecture 91"
+    ]
   },
   {
     "id": "anderson-problem-8a",
@@ -1031,7 +1433,19 @@
     "assessment": "A genuine result in commutative algebra. Its roughly 19,000-line formalization may be at least as influential methodologically as the theorem itself.",
     "auditNotes": "Public, sorry-free Lean 4 repository and an arXiv preprint — but unrefereed, with no named independent commutative-algebra expert publicly confirming that the Lean definitions faithfully render Anderson's originals.",
     "provenanceNote": "Press framing calls this “Anderson's conjecture”; it is Problem 8a from a 2014 Springer problem list, not a famous named conjecture.",
-    "supersededBy": null
+    "supersededBy": null,
+    "externalIds": {
+      "arxiv": [
+        "2604.03789"
+      ],
+      "github": [
+        "frenzymath/anderson-conjecture"
+      ]
+    },
+    "aliases": [
+      "Anderson's quasi-complete local-ring problem",
+      "anderson s quasi complete local ring problem"
+    ]
   },
   {
     "id": "graffiti-conjecture-154",
@@ -1060,7 +1474,12 @@
     "assessment": "The result is valid, but the recorded run rediscovered a witness published one month earlier, sharply limiting new impact.",
     "auditNotes": "A community note dates the refutation to June 2026, so this is a rediscovery rather than a new July result. Excluded from the headline totals.",
     "provenanceNote": null,
-    "supersededBy": null
+    "supersededBy": null,
+    "externalIds": {},
+    "aliases": [
+      "Graffiti Conjecture 154",
+      "graffiti conjecture 154"
+    ]
   },
   {
     "id": "alleged-roll-conjecture",
@@ -1087,6 +1506,11 @@
     "assessment": "The example is standard and predates the claim; no credible provenance for the alleged open conjecture was found. This is a correction, not a new solution.",
     "auditNotes": "Traced to a single unverifiable social-media post. The stated result is contradicted by standard K3 derived-category theory. Excluded from the headline totals.",
     "provenanceNote": "No conjecture by this name appears in the mathematical literature, and no lab involvement is evidenced — the model attribution comes only from the original post.",
-    "supersededBy": null
+    "supersededBy": null,
+    "externalIds": {},
+    "aliases": [
+      "Alleged “Röll conjecture”",
+      "alleged roll conjecture"
+    ]
   }
 ]

@@ -147,6 +147,23 @@
       "default": null,
       "title": "Erdosnumber"
     },
+    "aliases": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Aliases",
+      "type": "array"
+    },
+    "externalIds": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Externalids",
+      "type": "object"
+    },
     "sources": {
       "items": {
         "format": "uri",

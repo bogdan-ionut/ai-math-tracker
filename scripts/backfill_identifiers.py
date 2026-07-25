@@ -1,0 +1,152 @@
+"""One-off, human-run enrichment of the curated registry (K4, K5).
+
+Adds two additive fields to every record in `data/results.json`:
+
+  aliases[]    — alternative names an observation might use for this problem
+  externalIds  — normalised identifiers derived from fields already present
+
+Nothing is invented: identifiers come from `erdosNumber`, `paperUrl`,
+`leanArtifactUrl` and `sources[]` that are already in the record, run through the
+same extractor the observation side uses, so both sides speak the same language.
+
+This is a **curator action**, not automation. The pipeline still never writes this
+file — `test_curated_results_are_never_touched` continues to enforce that.
+
+    python scripts/backfill_identifiers.py --dry-run
+    python scripts/backfill_identifiers.py
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from scripts.automation.identifiers import extract_identifiers, normalize_title  # noqa: E402
+
+RESULTS = ROOT / "data" / "results.json"
+ALIASES_OUT = ROOT / "data" / "automation" / "aliases.json"
+
+
+def derive_external_ids(rec: dict) -> dict[str, list[str]]:
+    """Pull identifiers out of the fields the record already carries."""
+    blob_links = [
+        u for u in (
+            [rec.get("paperUrl"), rec.get("leanArtifactUrl"), rec.get("artifactUrl")]
+            + list(rec.get("sources") or [])
+        ) if u
+    ]
+    # Identity only — deliberately NOT the description. A description may cite
+    # another problem ("same method as #1196"), and treating that as identity
+    # made one identifier point at two records, which would make deterministic
+    # matching ambiguous exactly where it is supposed to be certain.
+    text_bits = [rec.get("title") or ""]
+    if rec.get("erdosNumber"):
+        text_bits.append(f"Erdős problem {rec['erdosNumber']}")
+    ids = extract_identifiers(" ".join(text_bits), blob_links).to_dict()
+
+    # Batch members carry their own Erdős numbers.
+    for m in rec.get("members") or []:
+        for num in re.findall(r"#(\d+)", m):
+            ids.setdefault("erdos", []).append(num)
+
+    return {k: sorted(set(v)) for k, v in ids.items() if v}
+
+
+def derive_aliases(rec: dict) -> list[str]:
+    """Names a post might plausibly use for this problem.
+
+    Conservative: only mechanical variants of what the record already says. No
+    guessing at nicknames.
+    """
+    out: set[str] = set()
+    title = rec.get("title") or ""
+    if title:
+        out.add(title)
+        # strip a trailing parenthetical, e.g. "Jacobian conjecture (1939)"
+        bare = re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
+        if bare and bare != title:
+            out.add(bare)
+        # ASCII-folded form, so "Erdős" also matches "Erdos"
+        folded = normalize_title(title)
+        if folded:
+            out.add(folded)
+
+    num = rec.get("erdosNumber")
+    if num:
+        n = str(num).lstrip("#")
+        out.update({f"Erdős #{n}", f"Erdos #{n}", f"Erdős problem {n}",
+                    f"Erdos problem {n}", f"erdosproblems.com/{n}"})
+
+    out.discard("")
+    return sorted(out)
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    records = json.loads(RESULTS.read_text(encoding="utf-8"))
+
+    changed = 0
+    alias_index: dict[str, str] = {}
+    id_index: dict[str, list[str]] = {}
+
+    for rec in records:
+        ids = derive_external_ids(rec)
+        aliases = derive_aliases(rec)
+        if rec.get("externalIds") != ids or rec.get("aliases") != aliases:
+            changed += 1
+        rec["externalIds"] = ids
+        rec["aliases"] = aliases
+
+        for a in aliases:
+            key = normalize_title(a)
+            if key:
+                alias_index.setdefault(key, rec["id"])
+        for kind, values in ids.items():
+            for v in values:
+                id_index.setdefault(f"{kind}:{v}", []).append(rec["id"])
+
+    with_ids = sum(1 for r in records if r.get("externalIds"))
+    ambiguous = {k: v for k, v in id_index.items() if len(set(v)) > 1}
+
+    print(f"records            : {len(records)}")
+    print(f"changed            : {changed}")
+    print(f"with externalIds   : {with_ids}/{len(records)}")
+    print(f"alias index entries: {len(alias_index)}")
+    print(f"identifier entries : {len(id_index)}")
+    if ambiguous:
+        print(f"\n⚠️  identifiers pointing at more than one record ({len(ambiguous)}):")
+        for k, v in list(ambiguous.items())[:10]:
+            print(f"   {k} -> {sorted(set(v))}")
+
+    if args.dry_run:
+        print("\ndry run — nothing written")
+        return 0
+
+    RESULTS.write_text(json.dumps(records, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    ALIASES_OUT.parent.mkdir(parents=True, exist_ok=True)
+    ALIASES_OUT.write_text(
+        json.dumps(
+            {
+                "$comment": "Generated by scripts/backfill_identifiers.py from data/results.json. "
+                            "Do not hand-edit; add aliases to the curated record instead.",
+                "byAlias": alias_index,
+                "byIdentifier": {k: sorted(set(v)) for k, v in id_index.items()},
+            },
+            indent=2, ensure_ascii=False,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    print(f"\nwrote {RESULTS.relative_to(ROOT)} and {ALIASES_OUT.relative_to(ROOT)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

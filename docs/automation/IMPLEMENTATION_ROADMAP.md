@@ -11,7 +11,7 @@ proposed sequence are flagged **[amended]** with a reason.
 | 1 | Test scaffolding + deterministic ingestion | **completed** |
 | 1.5 | Query strategy, syntax probe and calibration **[amended]** | **completed** |
 | 2 | Gemini structured extraction | **completed** |
-| 3 | Entity matching and shortlist | planned |
+| 3 | Entity matching and shortlist | **completed** |
 | 4 | Safe merge engine and review queue | planned |
 | 5 | Scheduled GitHub Actions workflow | planned |
 | 6 | Additional high-precision sources **[amended]** | planned |
@@ -150,7 +150,7 @@ mitigated by pinning the model id and versioning the schema.
 
 ---
 
-## Sprint 3 — Entity matching and shortlist · `planned`
+## Sprint 3 — Entity matching and shortlist · `completed`
 
 **Objective.** Decide *what an observation is about*, cheaply and deterministically first.
 

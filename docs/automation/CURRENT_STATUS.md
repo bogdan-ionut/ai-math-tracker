@@ -6,8 +6,8 @@
 > meaningless daily diffs. See assessment §2.7.
 
 **Last updated:** 2026-07-25
-**Current sprint:** Sprint 2 — Gemini structured extraction · **completed**
-**Next recommended task:** Sprint 3 — entity matching and shortlist
+**Current sprint:** Sprint 3 — Entity matching and shortlist · **completed**
+**Next recommended task:** Sprint 4 — safe merge engine and review queue
 **Awaiting:** Q2/Q3 in §6; optional manual confirmation of the `teorth` / `erdosproblems` handles
 
 ---
@@ -125,11 +125,39 @@ Two bugs the work surfaced:
    returned a URL where our regex produced a slug. One identifier looking like two would
    silently weaken deterministic matching. The guard now folds onto our canonical form.
 
+### Sprint 3 — Entity matching and shortlist ✅
+
+- **K4/K5 closed.** `scripts/backfill_identifiers.py` (a curator action, not automation)
+  added `aliases` and `externalIds` to all 40 curated records, derived only from fields
+  already present. 24/40 now carry identifiers; `data/automation/aliases.json` holds the
+  alias and identifier indexes.
+- **`matching.py`** resolves in strict order: deterministic identifier → alias → lexical
+  shortlist. A certain match **never** costs a model call.
+- **Conflict is a hard exclusion.** A record whose identifier disagrees with the
+  observation is removed from every later phase.
+- **`judge_v1` prompt** with the seven decision values; the judge sees a capped shortlist
+  and is told to prefer `insufficient_information` over a guess.
+- **Judge payload is minimal** — no engagement data, and no editorial field
+  (`impact`, `assessment`, `auditNotes`, `confidence`) ever reaches it. Identity is the
+  judge's question; merit is a human's.
+- 27 tests; 147 total.
+
+Two bugs the work surfaced, both caught by tests rather than review:
+
+1. **The backfill made one identifier point at two records.** `erdos:1196` resolved to both
+   `erdos-1196` and `erdos-1217`, because the #1217 record's *description* says "same method
+   as #1196". Identity is now derived from title and `erdosNumber` only — never free text
+   that may cite another problem. A test asserts no identifier maps to two records.
+2. **A conflicting identifier was being overridden by name similarity.** An observation
+   carrying Erdős #999 matched `erdos-728` at lexical score 100 and was returned as an
+   unambiguous match — precisely the failure the design exists to prevent. Conflict now
+   excludes the record entirely rather than merely annotating the outcome.
+
 ---
 
 ## Remaining work
 
-Sprints 3–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
+Sprints 4–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 
 ---
 
@@ -160,6 +188,9 @@ Sprints 3–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 | D21 | Only 4 of 21 extraction fields are **required** | A required field the post does not support is an invitation to invent one |
 | D22 | Model-reported identifiers are **cross-checked** against our regexes, and our canonical form wins | An invented arXiv id would be treated as a hard deterministic match and merge unrelated problems |
 | D23 | Prompt files are documentation **and** prompt; only the `## SYSTEM` section onward is sent | The header discusses engagement metrics, which the prompt must never mention |
+| D24 | Curated identity is derived from **title + erdosNumber only**, never the description | A description may cite another problem; treating that as identity made one identifier point at two records |
+| D25 | An identifier conflict **excludes the record from all matching phases** | Otherwise a fuzzy title match can override an explicit disagreement — Erdős #999 matched #728 at score 100 before this |
+| D26 | The judge sees no editorial field and no engagement data | It decides identity, never merit |
 
 ---
 
@@ -185,8 +216,8 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 | K1 | ~~No Python test runner~~ | — | ✅ Closed in Sprint 1 (pytest, 49 tests) |
 | K2 | No JS test runner (`vitest` absent) | Blocks frontend tests only | Sprint 7, when there is frontend behaviour to test |
 | K3 | ~~Broken `lint` script~~ | — | ✅ Closed in Sprint 1 (removed) |
-| K4 | No `aliases` field on curated records | Weakens alias matching | Sprint 3 — needed by the matcher, not by ingestion |
-| K5 | No structured external-identifier field on curated records | Weakens deterministic matching | Sprint 3 — observations already extract them; curated side needed for matching |
+| K4 | ~~No `aliases` field~~ | — | ✅ Closed in Sprint 3 (backfilled) |
+| K5 | ~~No structured external-identifier field~~ | — | ✅ Closed in Sprint 3 (24/40 carry identifiers; the rest have no source to derive from — see K6) |
 | K6 | Only **13 of 40** records carry a source URL | Weakens corroboration matching | Backfill is a human task; not automation's job |
 | K8 | `teorth` and `erdosproblems` handles return no results | Loses two high-value trusted accounts | Confirm the correct handles by hand, then enable |
 | K9 | Gold set is fitted to wordings we already know | 100% recall is a floor, not proof | Add positives whenever a real miss is observed |
@@ -196,7 +227,7 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 ## Tests
 
-**Currently passing:** 120 / 120 (`python -m pytest`) — no network, no API keys required.
+**Currently passing:** 147 / 147 (`python -m pytest`) — no network, no API keys required.
 **Currently failing:** none.
 **Build health:** `python scripts/build_data.py` ✅ · `pnpm build` ✅ · live deploy ✅
 **`data/results.json`:** byte-identical — asserted by `test_curated_results_are_never_touched`.
