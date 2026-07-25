@@ -227,6 +227,7 @@ def run(
             timeout=ing.get("httpTimeoutSeconds", 20),
             max_retries=ing.get("maxRetries", 3),
             backoff=ing.get("retryBackoffSeconds", 2.0),
+            min_interval=ing.get("minRequestIntervalSeconds", 1.5),
         )
         source = "twitterapi.io"
 

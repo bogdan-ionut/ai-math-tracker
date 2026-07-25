@@ -162,7 +162,7 @@ def probe_handles(client: TwitterApiClient) -> list[dict]:
 
 def main() -> int:
     try:
-        client = TwitterApiClient(timeout=25, max_retries=2)
+        client = TwitterApiClient(timeout=25, max_retries=4, min_interval=2.5)
     except TwitterApiError as exc:
         print(f"::error::{exc}")
         return 1

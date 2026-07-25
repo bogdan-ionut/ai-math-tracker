@@ -40,6 +40,7 @@ class TwitterApiClient:
         timeout: float = 20.0,
         max_retries: int = 3,
         backoff: float = 2.0,
+        min_interval: float = 1.2,
         base_url: str = BASE_URL,
     ) -> None:
         key = api_key if api_key is not None else os.environ.get("TWITTERAPI_IO_KEY", "")
@@ -53,7 +54,22 @@ class TwitterApiClient:
         self._max_retries = max_retries
         self._backoff = backoff
         self._base_url = base_url.rstrip("/")
+        # TwitterAPI.io rate-limits aggressively: a burst of back-to-back calls
+        # returns 429 on alternating requests (measured 2026-07-25, probe run
+        # 30155008096 — 37 rapid calls, ~40% rejected). Retrying alone is not
+        # enough; requests must be *paced*.
+        self._min_interval = min_interval
+        self._last_call_at = 0.0
         self.call_count = 0
+
+    def _pace(self) -> None:
+        """Block until at least ``min_interval`` has passed since the last call."""
+        if self._min_interval <= 0:
+            return
+        elapsed = time.monotonic() - self._last_call_at
+        if self._last_call_at and elapsed < self._min_interval:
+            time.sleep(self._min_interval - elapsed)
+        self._last_call_at = time.monotonic()
 
     # -- internals ---------------------------------------------------------
 
@@ -66,6 +82,7 @@ class TwitterApiClient:
         last: Exception | None = None
         for attempt in range(1, self._max_retries + 1):
             try:
+                self._pace()
                 self.call_count += 1
                 with httpx.Client(timeout=self._timeout) as client:
                     resp = client.get(url, params=params, headers=self._headers())
@@ -76,7 +93,12 @@ class TwitterApiClient:
                     last = TwitterApiError(f"HTTP {resp.status_code} from search endpoint")
                     if attempt < self._max_retries:
                         retry_after = resp.headers.get("retry-after")
-                        delay = float(retry_after) if (retry_after or "").isdigit() else self._backoff * attempt
+                        if retry_after and retry_after.isdigit():
+                            delay = float(retry_after)
+                        elif resp.status_code == 429:
+                            delay = max(self._backoff, self._min_interval) * (2 ** attempt)
+                        else:
+                            delay = self._backoff * attempt
                         time.sleep(min(delay, 30.0))
                         continue
                     raise last
