@@ -227,6 +227,56 @@ def _verdict(tid, author, hit_a, hit_b, found, probe) -> dict:
     }
 
 
+# ------------------------------------------------------------------ experiment 3
+
+def bisect_conjunction(probe: Probe, query: str) -> dict:
+    """Where is the boundary, and is it the total or the largest group?
+
+    Experiment 1 showed a 35-term group returns results *alone* but kills the
+    query when conjoined, while trimming it to 2 restores it. That is the fix's
+    shape — but "cap what?" needs an answer, and the two candidates make
+    different predictions:
+
+      total       — 4 AND 20 should fail exactly like 20 AND 4
+      largest     — both should fail, but an even 12 AND 12 (same total) should
+                    survive if the cap is per-group
+
+    So: walk one group's size down with the other pinned small, then re-test the
+    discovered boundary split evenly.
+    """
+    groups, tail = parse(query)
+    print("\n── Experiment 3: where the conjunction breaks\n")
+    if len(groups) < 2:
+        return {}
+
+    small, big = groups[0][:2], groups[1]
+    sizes = [n for n in (35, 28, 24, 20, 16, 12, 8) if n <= len(big)]
+    results: dict[int, int] = {}
+    for n in sizes:
+        t = probe.run(f"2 AND {n} terms", f"{g(small)} {g(big[:n])} {tail}")
+        if t.error is None:
+            results[n] = t.returned
+
+    working = [n for n, got in results.items() if got > 0]
+    failing = [n for n, got in results.items() if got == 0]
+    boundary = max(working) if working else None
+    out = {"perSize": results, "largestWorking": boundary,
+           "smallestFailing": min(failing) if failing else None}
+
+    # Same total, split evenly — the discriminating case.
+    if boundary and failing:
+        total = min(failing) + 2
+        half = total // 2
+        if half <= len(groups[0]) and half <= len(big):
+            t = probe.run(f"{half} AND {total - half} terms (same total, even split)",
+                          f"{g(groups[0][:half])} {g(big[:total - half])} {tail}",
+                          f"total {total} failed as 2 AND {min(failing)}")
+            if t.error is None:
+                out["evenSplitAtFailingTotal"] = t.returned
+                out["capIsOn"] = "total" if t.returned == 0 else "the largest group"
+    return out
+
+
 # ------------------------------------------------------------------ main
 
 def main() -> int:
@@ -241,6 +291,7 @@ def main() -> int:
 
     ablate(probe, query)
     result = witness(probe, query)
+    limits = bisect_conjunction(probe, query)
 
     print("\n── Summary\n")
     zeros = [t for t in probe.trials if t.error is None and t.returned == 0]
@@ -263,10 +314,18 @@ def main() -> int:
     else:
         print(f"\n  VERDICT: inconclusive — {result.get('why')}")
 
+    if limits.get("largestWorking"):
+        print(f"\n  Largest second group that survives a conjunction: "
+              f"{limits['largestWorking']} terms "
+              f"(fails at {limits['smallestFailing']}).")
+        if "capIsOn" in limits:
+            print(f"  The cap is on {limits['capIsOn']}.")
+
     OUT.write_text(json.dumps({
         "target": TARGET,
         "trials": [vars(t) for t in probe.trials],
         "witness": result,
+        "conjunctionLimits": limits,
         "apiCalls": client.call_count,
     }, indent=2, ensure_ascii=False))
     print(f"\n  api calls: {client.call_count}   report: {OUT}")
