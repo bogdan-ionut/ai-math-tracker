@@ -1,0 +1,408 @@
+{
+  "$comment": "Keyword taxonomy and query families for X/Twitter discovery. Editable without touching pipeline code. Operator support was measured, not assumed — see docs/automation/TWITTER_QUERY_STRATEGY.md and probe run 30155078770.",
+  "version": 2,
+  "syntax": {
+    "verifiedOn": "2026-07-25",
+    "probeRun": "30155078770",
+    "supported": [
+      "quoted phrase",
+      "OR",
+      "parentheses",
+      "implicit AND",
+      "-negation",
+      "lang:",
+      "-filter:retweets",
+      "url:",
+      "since:",
+      "unicode"
+    ],
+    "notes": "788-char query accepted without error. Pagination returns 20 tweets/page. queryType Latest|Top."
+  },
+  "clusters": {
+    "$comment": "Reusable term groups. Templates below combine them; the builder quotes multi-word terms and joins with OR.",
+    "ai": [
+      "AI",
+      "LLM",
+      "\"language model\"",
+      "\"reasoning model\"",
+      "\"AI-assisted\"",
+      "\"AI-generated\"",
+      "\"machine-generated\"",
+      "\"computer-assisted\""
+    ],
+    "systems": [
+      "AlphaProof",
+      "AlphaGeometry",
+      "Aletheia",
+      "Aristotle",
+      "\"Deep Think\"",
+      "Gemini",
+      "GPT",
+      "Claude",
+      "Grok",
+      "Codex",
+      "Devin",
+      "AxiomProver",
+      "Fable",
+      "MathDyad",
+      "Rethlas",
+      "Archon",
+      "Harmonic",
+      "\"AlphaProof Nexus\""
+    ],
+    "provers": [
+      "Lean",
+      "Lean4",
+      "\"Lean 4\"",
+      "mathlib",
+      "Coq",
+      "Isabelle",
+      "\"HOL Light\"",
+      "Metamath",
+      "autoformalization"
+    ],
+    "objects": [
+      "conjecture",
+      "\"open problem\"",
+      "\"unsolved problem\"",
+      "theorem",
+      "lemma",
+      "counterexample",
+      "\"upper bound\"",
+      "\"lower bound\"",
+      "classification"
+    ],
+    "resolutionVerbs": [
+      "solved",
+      "settled",
+      "resolved",
+      "proved",
+      "proven",
+      "disproved",
+      "refuted",
+      "\"we prove\"",
+      "\"we solve\"",
+      "\"we settle\"",
+      "\"we resolve\"",
+      "\"found a counterexample\"",
+      "\"new counterexample\""
+    ],
+    "verificationTerms": [
+      "\"verified in Lean\"",
+      "\"formalized in Lean\"",
+      "\"formalised in Lean\"",
+      "\"Lean formalization\"",
+      "\"machine-checked\"",
+      "\"proof checks out\"",
+      "\"independently verified\"",
+      "\"independently confirmed\"",
+      "\"proof artifact\"",
+      "\"formal proof\""
+    ],
+    "disputeTerms": [
+      "\"proof is wrong\"",
+      "\"gap in the proof\"",
+      "\"error in the proof\"",
+      "withdrawn",
+      "retracted",
+      "\"already known\"",
+      "\"not actually new\"",
+      "rediscovery",
+      "rediscovered",
+      "\"follows from\"",
+      "\"special case of\"",
+      "\"incorrectly attributed\"",
+      "\"does not exist\""
+    ],
+    "registries": [
+      "\"Erdős problem\"",
+      "\"Erdos problem\"",
+      "erdosproblems.com",
+      "OEIS",
+      "MathOverflow",
+      "\"Open Problem Garden\""
+    ],
+    "publication": [
+      "arXiv",
+      "preprint",
+      "\"new paper\"",
+      "\"paper is out\"",
+      "\"proof repository\""
+    ],
+    "negative": {
+      "$comment": "Applied conservatively. These are unambiguous non-mathematical senses of 'proof'. Deliberately does NOT exclude generic words like exercise/problem/homework — the Gemini relevance classifier handles those far better than keyword exclusion, which would kill real signal.",
+      "terms": [
+        "\"proof of work\"",
+        "\"proof-of-work\"",
+        "\"proof of stake\"",
+        "\"zero-knowledge proof\"",
+        "airdrop",
+        "\"price prediction\""
+      ]
+    },
+    "academicPhrases": [
+      "\"we prove\"",
+      "\"we settle\"",
+      "\"we resolve\"",
+      "\"we show\"",
+      "\"in this paper we\"",
+      "\"we answer a question of\"",
+      "\"we give a counterexample\"",
+      "\"we establish\"",
+      "\"suggested by\"",
+      "\"was found by\"",
+      "\"was discovered by\""
+    ],
+    "$systemsProvenance": "Seeded by hand, then reconciled against the `model` field of data/results.json on 2026-07-25 — that reconciliation added Fable, MathDyad, Rethlas, Archon and Harmonic, whose absence caused a gold-set dispute post to be missed entirely. Re-run `python -m scripts.automation.calibrate` after adding a new system."
+  },
+  "defaults": {
+    "queryType": "Latest",
+    "maxPagesPerQuery": 1,
+    "language": "en",
+    "excludeRetweets": true,
+    "$excludeRetweetsComment": "Verified supported. Filtering at the API saves quota; the ingest layer still collapses retweets onto their original as a second line of defence."
+  },
+  "tiers": {
+    "1": {
+      "label": "high precision",
+      "maxResultsPerRun": 40,
+      "runEveryDays": 1
+    },
+    "2": {
+      "label": "balanced",
+      "maxResultsPerRun": 30,
+      "runEveryDays": 1
+    },
+    "3": {
+      "label": "broad recall",
+      "maxResultsPerRun": 20,
+      "runEveryDays": 1,
+      "$comment": "Capped hardest and monitored for noise; never creates a candidate on its own."
+    }
+  },
+  "families": [
+    {
+      "id": "explicit-ai-solution",
+      "tier": 1,
+      "enabled": true,
+      "purpose": "Explicit claims that an AI system solved, proved or disproved a mathematical problem.",
+      "template": {
+        "all": [
+          "resolutionVerbs",
+          "objects"
+        ],
+        "any": [
+          "ai",
+          "systems"
+        ]
+      },
+      "expectedPrecision": "high",
+      "version": 1
+    },
+    {
+      "id": "academic-announcement",
+      "tier": 2,
+      "enabled": true,
+      "purpose": "Authors announcing their own result in normal academic phrasing, without the word 'breakthrough'.",
+      "expectedPrecision": "medium-high",
+      "version": 1,
+      "template": {
+        "all": [
+          "academicPhrases",
+          "objects"
+        ],
+        "any": [
+          "ai",
+          "systems"
+        ]
+      },
+      "calibrationNote": "Rebuilt after calibration: the original literal listed only generic AI words and therefore missed 'suggested by output from GPT-5.4 Pro'. System names are now in scope."
+    },
+    {
+      "id": "formal-verification",
+      "tier": 1,
+      "enabled": true,
+      "purpose": "Formal Lean/Coq/Isabelle verification of an AI-produced result — the strongest corroboration signal we can search for.",
+      "template": {
+        "all": [
+          "verificationTerms"
+        ],
+        "any": [
+          "ai",
+          "systems",
+          "provers"
+        ]
+      },
+      "expectedPrecision": "high",
+      "version": 1
+    },
+    {
+      "id": "disputes-and-corrections",
+      "tier": 1,
+      "enabled": true,
+      "purpose": "Claims that a prior result was wrong, withdrawn, overstated, a rediscovery, or already in the literature. This project's two disputed records (Röll, Graffiti 154) are exactly this signal, and Sprint 1 could not find them at all.",
+      "template": {
+        "all": [
+          "disputeTerms"
+        ],
+        "any": [
+          "ai",
+          "systems"
+        ]
+      },
+      "expectedPrecision": "medium",
+      "routesTo": "review_queue",
+      "version": 1
+    },
+    {
+      "id": "problem-registries",
+      "tier": 1,
+      "enabled": true,
+      "purpose": "Posts naming a canonical problem registry — these carry deterministic identifiers, so they are the highest-value observations we can collect.",
+      "template": {
+        "all": [
+          "registries"
+        ],
+        "any": [
+          "ai",
+          "systems"
+        ]
+      },
+      "expectedPrecision": "high",
+      "version": 1
+    },
+    {
+      "id": "artifact-release",
+      "tier": 2,
+      "enabled": true,
+      "purpose": "Preprint/repository announcements — evidence for a claim rather than the claim itself.",
+      "template": {
+        "all": [
+          "publication"
+        ],
+        "any": [
+          "objects"
+        ],
+        "andAny": [
+          "ai",
+          "systems"
+        ]
+      },
+      "expectedPrecision": "medium",
+      "version": 1
+    },
+    {
+      "id": "arxiv-linked",
+      "tier": 2,
+      "enabled": true,
+      "purpose": "Posts that actually link arXiv, using the verified url: operator. High corroboration rate by construction.",
+      "literal": "url:arxiv.org (conjecture OR theorem OR \"open problem\" OR counterexample) (AI OR LLM OR \"language model\")",
+      "expectedPrecision": "medium-high",
+      "version": 1
+    },
+    {
+      "id": "named-systems",
+      "tier": 2,
+      "enabled": true,
+      "purpose": "Named theorem-proving systems combined with mathematical language. Never a bare model name.",
+      "template": {
+        "all": [
+          "systems"
+        ],
+        "any": [
+          "objects",
+          "verificationTerms"
+        ]
+      },
+      "expectedPrecision": "medium",
+      "version": 1
+    },
+    {
+      "id": "broad-recall",
+      "tier": 3,
+      "enabled": true,
+      "purpose": "Safety net for wording the taxonomy does not anticipate. Hard-capped, monitored, and never sufficient on its own to create a candidate.",
+      "template": {
+        "all": [
+          "ai"
+        ],
+        "any": [
+          "objects"
+        ]
+      },
+      "expectedPrecision": "low",
+      "applyNegativeTerms": true,
+      "version": 1
+    }
+  ],
+  "trustedAccounts": {
+    "$comment": "Only handles VERIFIED by the from: probe are enabled. Handles that returned no results are listed disabled rather than deleted, so the record shows they were considered and not silently invented. Never enable a handle that has not been probe-verified.",
+    "queryTemplate": "from:{handle} (proof OR conjecture OR theorem OR \"open problem\" OR Lean OR counterexample OR formalization)",
+    "accounts": [
+      {
+        "username": "octonion",
+        "category": "mathematician",
+        "priority": "high",
+        "enabled": true,
+        "verifiedOn": "2026-07-25",
+        "notes": "Cited as a source in data/results.json (Gaussian moments)."
+      },
+      {
+        "username": "imjaredz",
+        "category": "practitioner",
+        "priority": "high",
+        "enabled": true,
+        "verifiedOn": "2026-07-25",
+        "notes": "Cited as a source in data/results.json (Graffiti 39/40, Brandt)."
+      },
+      {
+        "username": "GoogleDeepMind",
+        "category": "lab",
+        "priority": "medium",
+        "enabled": true,
+        "verifiedOn": "2026-07-25",
+        "notes": "AlphaProof announcements."
+      },
+      {
+        "username": "OpenAI",
+        "category": "lab",
+        "priority": "medium",
+        "enabled": true,
+        "verifiedOn": "2026-07-25",
+        "notes": "Cycle Double Cover announcement."
+      },
+      {
+        "username": "leanprover",
+        "category": "formal-methods",
+        "priority": "medium",
+        "enabled": true,
+        "verifiedOn": "2026-07-25",
+        "notes": "Lean/mathlib releases."
+      },
+      {
+        "username": "erdosproblems",
+        "category": "registry",
+        "priority": "high",
+        "enabled": false,
+        "verifiedOn": null,
+        "notes": "Probe returned no results — handle unconfirmed. Do not enable without verification."
+      },
+      {
+        "username": "teorth",
+        "category": "mathematician",
+        "priority": "high",
+        "enabled": false,
+        "verifiedOn": null,
+        "notes": "Probe returned no results — handle unconfirmed. Terence Tao audits AI proofs; worth confirming the correct handle by hand."
+      },
+      {
+        "username": "XenaProject",
+        "category": "formal-methods",
+        "priority": "medium",
+        "enabled": false,
+        "verifiedOn": null,
+        "notes": "Probe returned no results — handle unconfirmed."
+      }
+    ]
+  }
+}

@@ -9,6 +9,7 @@ proposed sequence are flagged **[amended]** with a reason.
 |---|---|---|
 | 0 | Repository assessment and architecture | **completed** |
 | 1 | Test scaffolding + deterministic ingestion | **completed** |
+| 1.5 | Query strategy, syntax probe and calibration **[amended]** | **completed** |
 | 2 | Gemini structured extraction | planned |
 | 3 | Entity matching and shortlist | planned |
 | 4 | Safe merge engine and review queue | planned |
@@ -86,6 +87,41 @@ byte-identical. `build_data.py` and `pnpm build` still pass.
 **Dependencies.** Sprint 0. **Risks.** TwitterAPI.io response shape may differ from the
 docs — mitigated by fixture-driven development and a tolerant parser.
 **Rollback.** Delete `scripts/automation/` and `data/automation/`; nothing else reads them.
+
+---
+
+## Sprint 1.5 — Query strategy, syntax probe and calibration · `completed` **[amended, new]**
+
+**Objective.** Replace hand-written intuition queries with a measured, calibrated,
+configuration-driven search strategy — before the daily automation starts spending money on
+the wrong searches.
+
+> **[amended]** Not in the original plan. Added after a proposal review: Sprint 1's queries
+> were written from intuition, searched only for *success* claims, and used six account
+> handles written from memory. The live smoke test (15% corroboration) showed recall was the
+> binding constraint.
+
+**Files.** `.github/workflows/probe-twitter-syntax.yml`, `scripts/automation/probe_syntax.py`,
+`config/twitter_discovery.json` (replaces `config/twitter_queries.json`),
+`scripts/automation/query_builder.py`, `scripts/automation/calibrate.py`,
+`tests/automation/fixtures/gold_set.json`, `tests/automation/test_query_strategy.py`,
+`docs/automation/TWITTER_QUERY_STRATEGY.md`, `scripts/automation/twitter.py` (pacing),
+`scripts/automation/ingest.py` (taxonomy + telemetry).
+
+**Deliverables.** Operator support verified against the live API; request pacing after
+measuring 429s; keyword taxonomy with a template grammar; 14 queries across 3 tiers with
+per-family caps; dispute/verification/registry/arXiv families; probe-verified trusted
+accounts; gold-set calibration harness; per-query telemetry; strategy document.
+
+**Validation.** `python -m scripts.automation.calibrate` → 12/12 recall, 3/10 noise.
+73 tests green, no network, no keys. `results.json` byte-identical.
+
+**Acceptance criteria.** ✅ Syntax verified, not assumed. ✅ No handle enabled without probe
+verification (test-enforced). ✅ Dispute language searched. ✅ Recall and noise locked by tests.
+✅ Noisy families disableable from config alone.
+
+**Dependencies.** Sprint 1. **Risks.** Gold-set circularity — documented as blind spot 5.
+**Rollback.** Re-enable the previous flat query list; the ingest interface is unchanged.
 
 ---
 

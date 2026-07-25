@@ -1,0 +1,136 @@
+{
+  "$comment": "Gold set for query calibration. POSITIVES are drawn from events already in data/results.json. Where the literal post text was captured during research it is marked verbatim:true; the rest are faithful reconstructions of how such an announcement is phrased, marked verbatim:false — they test whether the query set catches the WORDING PATTERN, and must never be presented as real quotations. NEGATIVES are realistic false positives.",
+  "version": 1,
+  "positives": [
+    {
+      "id": "graffiti-154-announcement",
+      "verbatim": true,
+      "source": "https://x.com/imjaredz/status/2080088344424583261",
+      "relatedRecord": "graffiti-conjecture-154",
+      "signalType": "counterexample announcement",
+      "text": "1) Graffiti Conjecture 154 REFUTED. Open for ~40 years. Devin found the counterexample: glue a 50-clique to a 70-edge path (n=120). The violation reduces to a single integer inequality, proven in Lean down to the graph's distance sum. 2) Graffiti Conjectures 39 & 40 PROVEN.",
+      "author": "imjaredz"
+    },
+    {
+      "id": "gaussian-moments-announcement",
+      "verbatim": true,
+      "source": "https://x.com/octonion/status/2079183963382284288",
+      "relatedRecord": "two-dimensional-gaussian-moments-conjecture",
+      "signalType": "counterexample announcement",
+      "text": "Whoa, GPT 5.6 Sol just found a small counterexample for the Gaussian Moments Conjecture that's *not* derived from the counterexample found for the Jacobian Conjecture. GMC is false for n≥4. (!) Note this does not disprove the Jacobian Conjecture; the implication is one way.",
+      "author": "octonion"
+    },
+    {
+      "id": "cdc-proof-announcement",
+      "verbatim": false,
+      "relatedRecord": "cycle-double-cover",
+      "signalType": "proof announcement, named system",
+      "text": "GPT-5.6 Sol Ultra produced a proof of the Cycle Double Cover conjecture. Two pages. It has been independently formalized in Lean 4 three times now: https://github.com/openai/cdc-lean"
+    },
+    {
+      "id": "jacobian-counterexample",
+      "verbatim": false,
+      "relatedRecord": "jacobian-conjecture-1939",
+      "signalType": "counterexample, decades-old problem",
+      "text": "Claude Fable 5 together with Levent Alpöge produced an explicit Keller map refuting the Jacobian conjecture in dimension 3. Open since 1939. The n=2 case remains open."
+    },
+    {
+      "id": "erdos-728-registry",
+      "verbatim": false,
+      "relatedRecord": "erdos-728",
+      "signalType": "registry post with identifier",
+      "text": "Erdős problem #728 is now marked solved on erdosproblems.com — GPT-5.2 Pro plus Harmonic's Aristotle, with the final artifact in Lean."
+    },
+    {
+      "id": "academic-phrasing-no-buzzwords",
+      "verbatim": false,
+      "relatedRecord": "erdos-1196",
+      "signalType": "academic announcement without the word 'breakthrough'",
+      "text": "New preprint: we prove the asymptotic primitive set conjecture of Erdős, Sárközy and Szemerédi. The key method was suggested by output from GPT-5.4 Pro. arXiv:2604.11821"
+    },
+    {
+      "id": "lean-formalization-evidence",
+      "verbatim": false,
+      "relatedRecord": "anderson-problem-8a",
+      "signalType": "formal verification evidence, not a new claim",
+      "text": "The Anderson Problem 8a counterexample is now fully formalized in Lean 4 — 19,448 lines, sorry-free. Produced by an AI agent stack with no human mathematical input. Repo: https://github.com/frenzymath/Anderson-Conjecture"
+    },
+    {
+      "id": "dispute-already-known",
+      "verbatim": false,
+      "relatedRecord": "graffiti-conjecture-154",
+      "signalType": "dispute — rediscovery",
+      "text": "Community note on the Graffiti 154 claim: this counterexample was already known — the same witness was published a month earlier. The AI run rediscovered it rather than finding it."
+    },
+    {
+      "id": "dispute-no-such-conjecture",
+      "verbatim": false,
+      "relatedRecord": "alleged-roll-conjecture",
+      "signalType": "dispute — provenance failure",
+      "text": "I cannot find any trace of this so-called Röll conjecture in the literature. The claimed counterexample from Fable is standard and the conjecture does not exist as stated. This is a correction, not a new result."
+    },
+    {
+      "id": "independent-confirmation",
+      "verbatim": false,
+      "relatedRecord": "cycle-double-cover",
+      "signalType": "independent confirmation",
+      "text": "I have gone through the argument carefully and the proof checks out. Independently verified. This is a genuine resolution of a decades-old conjecture, produced with LLM assistance."
+    },
+    {
+      "id": "oeis-batch",
+      "verbatim": false,
+      "relatedRecord": "alphaproof-oeis-44",
+      "signalType": "batch result, registry",
+      "text": "AlphaProof Nexus proved 44 OEIS conjectures autonomously in Lean, alongside nine open Erdős problems."
+    },
+    {
+      "id": "arxiv-artifact-post",
+      "verbatim": false,
+      "relatedRecord": "erdos-793",
+      "signalType": "preprint release with link",
+      "text": "New paper on arXiv: the second-order constant for strongly 2-primitive sets, an open problem of Erdős. The solution was found by an AI reasoning model. https://arxiv.org/abs/2607.09912"
+    }
+  ],
+  "negatives": [
+    {
+      "id": "homework-help",
+      "text": "Can AI solve my calculus homework problem? ChatGPT got the integral wrong again lol"
+    },
+    {
+      "id": "benchmark-score",
+      "text": "New LLM benchmark results are out — the model scores 94% on GSM8K math word problems."
+    },
+    {
+      "id": "olympiad-perf",
+      "text": "The model got a silver medal on the IMO problems this year. Impressive for a language model."
+    },
+    {
+      "id": "crypto-pow",
+      "text": "Our new chain uses proof of work with an AI-optimised difficulty adjustment. Airdrop soon."
+    },
+    {
+      "id": "zk-proof",
+      "text": "We shipped zero-knowledge proof verification in the SDK. AI-assisted code generation made it fast."
+    },
+    {
+      "id": "philosophical",
+      "text": "Do you think AI will ever really do mathematics, or just pattern-match theorems it has seen?"
+    },
+    {
+      "id": "explainer",
+      "text": "Claude gave me a beautiful explanation of the proof of the infinitude of primes. Great teacher."
+    },
+    {
+      "id": "poc-software",
+      "text": "Built an AI proof of concept for our internal search. Counterexample: it hallucinated the schema."
+    },
+    {
+      "id": "security-proof",
+      "text": "The security proof for this protocol was machine-checked, no AI involved, just Coq and patience."
+    },
+    {
+      "id": "vague-hype",
+      "text": "AI is going to change everything about how we do research. The theorem of the future writes itself."
+    }
+  ]
+}

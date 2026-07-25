@@ -35,6 +35,7 @@ from scripts.automation.twitter import (  # noqa: E402
     TwitterApiClient,
     TwitterApiError,
 )
+from scripts.automation.query_builder import BuiltQuery, build_queries  # noqa: E402
 from scripts.automation.urls import canonicalize_url, expand_links, tweet_url  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -45,25 +46,8 @@ CONFIG_DIR = ROOT / "config"
 # config
 # --------------------------------------------------------------------------
 
-def load_config() -> tuple[dict, dict]:
-    automation = json.loads((CONFIG_DIR / "automation.json").read_text(encoding="utf-8"))
-    queries = json.loads((CONFIG_DIR / "twitter_queries.json").read_text(encoding="utf-8"))
-    return automation, queries
-
-
-def enabled_queries(qcfg: dict) -> list[tuple[str, str]]:
-    """Return (query_id, query_string) pairs, including per-account queries."""
-    defaults = qcfg.get("defaults", {})
-    out: list[tuple[str, str]] = []
-    for q in qcfg.get("queries", []):
-        if q.get("enabled", defaults.get("enabled", True)):
-            out.append((q["id"], q["query"]))
-    accounts = qcfg.get("accounts") or {}
-    if accounts.get("enabled"):
-        tpl = accounts.get("queryTemplate", "from:{handle}")
-        for handle in accounts.get("handles", []):
-            out.append((f"account-{handle}", tpl.format(handle=handle)))
-    return out
+def load_config() -> dict:
+    return json.loads((CONFIG_DIR / "automation.json").read_text(encoding="utf-8"))
 
 
 # --------------------------------------------------------------------------
@@ -207,7 +191,7 @@ def run(
     limit: int | None = None,
     lookback_hours: int | None = None,
 ) -> dict:
-    automation, qcfg = load_config()
+    automation = load_config()
     ing = automation["ingestion"]
     now_dt = datetime.now(timezone.utc)
     now = utc_now_iso()
@@ -232,30 +216,46 @@ def run(
         source = "twitterapi.io"
 
     # --- fetch ------------------------------------------------------------
-    queries = enabled_queries(qcfg)
+    queries: list[BuiltQuery] = build_queries()
     raw_records: list[RawTweet] = []
     failures: list[str] = []
-    qtype = qcfg.get("defaults", {}).get("queryType", "Latest")
-    pages = qcfg.get("defaults", {}).get("maxPagesPerQuery", 1)
+    telemetry: list[dict] = []
 
-    for qid, qstr in queries:
+    for bq in queries:
         try:
-            tweets = client.search(qstr, query_type=qtype, max_pages=pages)
+            tweets = client.search(bq.query, query_type="Latest", max_pages=1)
         except TwitterApiError as exc:
             # A partial failure must never wipe good data: record and continue.
-            failures.append(f"{qid}: {exc}")
+            failures.append(f"{bq.id}: {exc}")
+            telemetry.append({"queryId": bq.id, "tier": bq.tier, "error": str(exc)})
             continue
-        for t in tweets:
-            rec = normalise_tweet(t, qid, now, store_text)
+        kept = 0
+        for t in tweets[: bq.max_results]:
+            rec = normalise_tweet(t, bq.id, now, store_text)
             if rec and within_lookback(rec, lookback, now_dt):
                 raw_records.append(rec)
+                kept += 1
+        telemetry.append({
+            "queryId": bq.id, "tier": bq.tier,
+            "returned": len(tweets), "keptInWindow": kept,
+            "cappedAt": bq.max_results,
+        })
 
     # --- deduplicate (exact, by source-native id) -------------------------
     seen: dict[str, RawTweet] = {}
+    first_seen_by: dict[str, str] = {}
     for rec in raw_records:
         if rec.tweetId not in seen:
             seen[rec.tweetId] = rec
+            first_seen_by[rec.tweetId] = rec.matchedQueryId
     deduped = list(seen.values())
+
+    # per-query: how many observations did this family *uniquely* surface?
+    unique_by_query: dict[str, int] = {}
+    for qid in first_seen_by.values():
+        unique_by_query[qid] = unique_by_query.get(qid, 0) + 1
+    for row in telemetry:
+        row["uniqueFirstSeen"] = unique_by_query.get(row["queryId"], 0)
 
     capped = deduped[:max_obs]
     overflow = len(deduped) - len(capped)
@@ -287,6 +287,7 @@ def run(
         "observationsTotal": len(merged),
         "withExternalIdentifier": with_ids,
         "apiCalls": getattr(client, "call_count", 0),
+        "perQuery": telemetry,
     }
 
     if dry_run:
@@ -315,6 +316,10 @@ def run(
     state.bump("runs")
     state.bump_api("twitter", getattr(client, "call_count", 0))
     state.notes = failures[:10]
+    state.counters["queriesRun"] = len(queries)
+    # keep the latest per-query telemetry so noisy families can be retired on evidence
+    store.write_json(store.DATA_DIR / "query_telemetry.json",
+                     {"runAt": now, "perQuery": telemetry})
     store.write_json(store.state_path(), state.model_dump(mode="json"))
 
     return summary

@@ -6,9 +6,9 @@
 > meaningless daily diffs. See assessment §2.7.
 
 **Last updated:** 2026-07-25
-**Current sprint:** Sprint 1 — Test scaffolding + deterministic ingestion · **completed**
+**Current sprint:** Sprint 1.5 — Query strategy, syntax probe and calibration · **completed**
 **Next recommended task:** Sprint 2 — Gemini structured extraction (`gemini-3.6-flash`)
-**Awaiting:** Q2/Q3 in §6 (smoke test ✅ passed 2026-07-25)
+**Awaiting:** Q2/Q3 in §6; optional manual confirmation of the `teorth` / `erdosproblems` handles
 
 ---
 
@@ -63,6 +63,33 @@ The 15% corroboration rate is the important number: it is measured, not assumed,
 says a pipeline without the corroboration gate would produce roughly six unverifiable
 candidates for every corroborated one. Logged in ARCHITECTURE_ASSESSMENT §2.1.
 
+### Sprint 1.5 — Query strategy, syntax probe and calibration ✅
+
+Prompted by a proposal review. Sprint 1's queries were intuition, searched only success
+claims, and used handles written from memory.
+
+- **Syntax probed against the live API** (run `30155078770`). All of quoted phrase, `OR`,
+  parentheses/implicit AND, `-negation`, `lang:`, `-filter:retweets`, `url:`, `since:` and
+  Unicode are supported; a 788-char query is accepted.
+- **Rate limiting found and fixed.** The first probe fired 37 back-to-back calls and ~40%
+  returned 429. The client now paces requests; re-probe was 36 calls, zero 429s. This would
+  have silently dropped whole query families from the daily run.
+- **Taxonomy + template grammar** in `config/twitter_discovery.json`; 14 queries, 3 tiers,
+  per-family caps, all editable without code changes.
+- **Dispute/correction family added** — the significant hole in Sprint 1. Both `disputed`
+  records in this dataset are exactly that signal and were previously undiscoverable.
+- **Handles probe-verified.** 5 of 8 verified and enabled; `erdosproblems`, `teorth`,
+  `XenaProject` returned nothing and are kept **disabled**. A test blocks enabling a handle
+  without a `verifiedOn` date.
+- **Gold-set calibration** — 12/12 recall, 3/10 noise, both locked by tests.
+- **Per-query telemetry** with `uniqueFirstSeen`, so redundant families can be retired on
+  evidence rather than opinion.
+
+Calibration caught three things a review would not have: `academic-announcement` matched
+nothing (its AI group omitted system names); account queries appeared to match everything
+(the offline matcher ignored `from:`); and five system names present in `results.json`
+(Fable, MathDyad, Rethlas, Archon, Harmonic) were missing from the taxonomy.
+
 ---
 
 ## Remaining work
@@ -89,6 +116,12 @@ Sprints 2–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 | D12 | Retweets are attributed to the **original** tweet id | An RT and its source are one signal, not two — deduplication happens before any model call |
 | D13 | `lookbackHours` is overridable per run | Fixture tests must not depend on today's date; also satisfies the brief's "configurable lookback" |
 | D14 | The broken `lint` script was **removed**, not repaired | ESLint was never a dependency; adding a linter is a separate decision, not a side effect of this work |
+| D15 | Search syntax is **probed**, not assumed | An operator working on x.com is no evidence TwitterAPI.io supports it; all 10 were verified live |
+| D16 | Requests are **paced** (1.5s), not just retried | Measured ~40% 429s on a 37-call burst; retry alone would have masked intermittent family loss |
+| D17 | **One** taxonomy file, not the nine proposed | At this size a single file reviews better in a diff and cannot drift out of sync; the "editable without code changes" requirement is met either way |
+| D18 | A **dispute/correction** family is Tier 1 | Both `disputed` records here are that signal; Sprint 1 searched only success claims and could not have found either |
+| D19 | Trusted accounts require **probe verification** to be enabled | Sprint 1 shipped six handles from memory; three of them return nothing. Test-enforced |
+| D20 | Known false positives are **accepted**, not excluded by keyword | Recall in search, precision in the classifier. `-counterexample` would gut two of the best families |
 
 ---
 
@@ -117,13 +150,15 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 | K4 | No `aliases` field on curated records | Weakens alias matching | Sprint 3 — needed by the matcher, not by ingestion |
 | K5 | No structured external-identifier field on curated records | Weakens deterministic matching | Sprint 3 — observations already extract them; curated side needed for matching |
 | K6 | Only **13 of 40** records carry a source URL | Weakens corroboration matching | Backfill is a human task; not automation's job |
+| K8 | `teorth` and `erdosproblems` handles return no results | Loses two high-value trusted accounts | Confirm the correct handles by hand, then enable |
+| K9 | Gold set is fitted to wordings we already know | 100% recall is a floor, not proof | Add positives whenever a real miss is observed |
 | K7 | `resultType` and `resolution` are near-duplicate fields | Cosmetic | Out of scope; automation writes neither |
 
 ---
 
 ## Tests
 
-**Currently passing:** 49 / 49 (`python -m pytest`) — no network, no API keys required.
+**Currently passing:** 73 / 73 (`python -m pytest`) — no network, no API keys required.
 **Currently failing:** none.
 **Build health:** `python scripts/build_data.py` ✅ · `pnpm build` ✅ · live deploy ✅
 **`data/results.json`:** byte-identical — asserted by `test_curated_results_are_never_touched`.
@@ -157,7 +192,9 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 ## Next recommended task
 
-**Sprint 2 — Gemini structured extraction.** In order:
+**Sprint 2 — Gemini structured extraction.** The classifier is now the load-bearing
+component: search deliberately admits ~30% noise (see TWITTER_QUERY_STRATEGY §5) and
+Gemini is what rejects it. In order:
 
 1. `scripts/automation/gemini.py` — client for `gemini-3.6-flash`, timeout + retry,
    key from env only, never logged.

@@ -10,7 +10,6 @@ from scripts.automation import store
 from scripts.automation.identifiers import extract_identifiers, normalize_title
 from scripts.automation.ids import candidate_id, observation_id, review_id, text_hash
 from scripts.automation.ingest import (
-    enabled_queries,
     merge_observations,
     normalise_tweet,
     to_observation,
@@ -301,10 +300,11 @@ class TestPipeline:
 
 class TestConfig:
     def test_queries_load_and_include_accounts(self):
-        cfg = json.loads((ROOT / "config" / "twitter_queries.json").read_text())
-        qs = enabled_queries(cfg)
-        ids = [q for q, _ in qs]
-        assert "erdos-ai" in ids
+        from scripts.automation.query_builder import build_queries
+
+        ids = [q.id for q in build_queries()]
+        assert "explicit-ai-solution" in ids
+        assert "disputes-and-corrections" in ids
         assert any(i.startswith("account-") for i in ids)
 
     def test_no_secrets_in_config(self):
@@ -312,7 +312,10 @@ class TestConfig:
         that looks like a credential."""
         import re
 
-        cred = re.compile(r"^[A-Za-z0-9_\-]{24,}$")
+        # A credential is long AND high-entropy: mixed case plus digits. A plain
+        # kebab-case slug like "disputes-and-corrections" is 24 chars but is not
+        # a secret, and flagging it taught nothing.
+        cred = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z0-9_\-]{24,}$")
 
         def walk(node, where):
             if isinstance(node, dict):
@@ -324,7 +327,7 @@ class TestConfig:
             elif isinstance(node, str):
                 assert not cred.match(node), f"{where} looks like a credential"
 
-        for name in ("automation.json", "twitter_queries.json"):
+        for name in ("automation.json", "twitter_discovery.json"):
             walk(json.loads((ROOT / "config" / name).read_text()), name)
 
     def test_gemini_model_is_pinned(self):
