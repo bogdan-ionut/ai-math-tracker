@@ -1,0 +1,313 @@
+{
+  "additionalProperties": false,
+  "description": "One distinct open problem solved, refuted, or advanced with AI help.\n\nA single record may stand for a *batch* (count > 1, e.g. the 44 OEIS\nconjectures or the 26-problem \"Star Fleet\" run); ``members`` lists the\nindividual problems when their identities are known.",
+  "properties": {
+    "id": {
+      "minLength": 2,
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 2,
+      "title": "Title",
+      "type": "string"
+    },
+    "family": {
+      "title": "Family",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "resultType": {
+      "enum": [
+        "proof",
+        "refutation",
+        "counterexample",
+        "improved-bound",
+        "formalization",
+        "correction"
+      ],
+      "title": "Resulttype",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "audited",
+        "reported",
+        "provisional",
+        "disputed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "claimedAt": {
+      "format": "date",
+      "title": "Claimedat",
+      "type": "string"
+    },
+    "auditedAt": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Auditedat"
+    },
+    "lab": {
+      "title": "Lab",
+      "type": "string"
+    },
+    "labKey": {
+      "enum": [
+        "oa",
+        "dm",
+        "cg",
+        "ax",
+        "an",
+        "xa",
+        "pk"
+      ],
+      "title": "Labkey",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "humanCollaborators": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Humancollaborators"
+    },
+    "count": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Count",
+      "type": "integer"
+    },
+    "members": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Members"
+    },
+    "isOpenProblem": {
+      "default": true,
+      "title": "Isopenproblem",
+      "type": "boolean"
+    },
+    "yearsOpen": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Yearsopen"
+    },
+    "erdosNumber": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Erdosnumber"
+    },
+    "sources": {
+      "items": {
+        "format": "uri",
+        "maxLength": 2083,
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "paperUrl": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Paperurl"
+    },
+    "artifactUrl": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Artifacturl"
+    },
+    "leanArtifactUrl": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Leanartifacturl"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "auditNotes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Auditnotes"
+    },
+    "supersededBy": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersededby"
+    },
+    "impact": {
+      "anyOf": [
+        {
+          "maximum": 5,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Impact"
+    },
+    "assessment": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Assessment"
+    },
+    "resolution": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolution"
+    },
+    "resolutionNote": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resolutionnote"
+    },
+    "provenanceNote": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provenancenote"
+    }
+  },
+  "required": [
+    "id",
+    "title",
+    "family",
+    "description",
+    "resultType",
+    "status",
+    "claimedAt",
+    "lab",
+    "labKey",
+    "model",
+    "confidence"
+  ],
+  "title": "MathematicalResult",
+  "type": "object"
+}

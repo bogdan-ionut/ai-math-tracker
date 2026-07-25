@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-07-25T04:59:34+00:00",
+  "rangeStart": "2026-01-05",
+  "rangeEnd": "2026-07-24",
+  "total": 121,
+  "byStatus": {
+    "reported": 37,
+    "audited": 70,
+    "provisional": 14,
+    "disputed": 2
+  },
+  "byLab": {
+    "oa": 57,
+    "dm": 53,
+    "cg": 4,
+    "ax": 3,
+    "an": 3,
+    "xa": 2,
+    "pk": 1
+  },
+  "byLabAudited": {
+    "oa": 15,
+    "dm": 53,
+    "cg": 0,
+    "ax": 1,
+    "an": 1,
+    "xa": 0,
+    "pk": 0
+  },
+  "erdosCount": 62,
+  "largestDay": {
+    "date": "2026-05-21",
+    "count": 51
+  },
+  "oldestYearsOpen": 87,
+  "modelFamilies": 16,
+  "assessed": 16,
+  "byImpact": {
+    "3": 3,
+    "2": 6,
+    "4": 2,
+    "5": 3,
+    "1": 2
+  },
+  "landmarks": [
+    "erdos-90",
+    "cycle-double-cover",
+    "jacobian-conjecture-1939"
+  ]
+}

@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   "Proof Ledger" — a journal-of-record for machine-made mathematics.
+   Ground: ink with a faint squared-paper grid (the mathematician's
+   notebook). Display type is a Didone; data is monospaced.
+   Tokens are "R G B" triples so Tailwind can apply alpha.
+   ============================================================ */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --void: 8 8 11;          /* page ground — near-black, slight violet bias */
+  --panel: 17 17 21;       /* card */
+  --panel-2: 23 23 29;     /* raised card / hover */
+  --ink: 244 243 240;      /* warm off-white */
+  --ink-2: 166 164 158;
+  --muted: 116 114 124;
+  --rule: 37 37 44;        /* hairline */
+  --grid: 30 30 37;        /* graph-paper line */
+  --good: 63 191 95;       /* AUDITED ONLY */
+
+  --lab-oa: 57 135 229;
+  --lab-dm: 233 110 60;
+  --lab-cg: 34 178 128;
+  --lab-ax: 214 148 20;
+  --lab-an: 226 106 152;
+  --lab-xa: 143 132 235;
+  --lab-pk: 226 90 88;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --void: 250 249 246;
+  --panel: 255 255 255;
+  --panel-2: 246 245 242;
+  --ink: 17 17 20;
+  --ink-2: 74 73 70;
+  --muted: 130 128 136;
+  --rule: 226 224 218;
+  --grid: 234 232 226;
+  --good: 0 122 45;
+
+  --lab-oa: 33 106 199;
+  --lab-dm: 203 79 32;
+  --lab-cg: 14 140 97;
+  --lab-ax: 176 118 4;
+  --lab-an: 197 66 116;
+  --lab-xa: 88 74 205;
+  --lab-pk: 190 45 45;
+}
+
+* {
+  border-color: rgb(var(--rule) / 1);
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: rgb(var(--void));
+  color: rgb(var(--ink));
+  font-family: "Inter Variable", Inter, system-ui, sans-serif;
+  font-feature-settings: "cv05", "ss01";
+}
+
+/* The squared-paper ground: a 1px grid at 28px that fades out below the
+   masthead so it never competes with the data. Layered backgrounds only —
+   no fixed positioning and no mask, both of which break compositing. */
+.paper-ground {
+  position: relative;
+  background-color: rgb(var(--void));
+  background-image:
+    linear-gradient(to bottom, rgb(var(--void) / 0) 0px, rgb(var(--void)) 760px),
+    linear-gradient(to right, rgb(var(--grid) / 0.6) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--grid) / 0.6) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+  background-repeat: no-repeat, repeat, repeat;
+  background-attachment: scroll;
+}
+
+/* ---- type ---- */
+.display {
+  font-family: "Bodoni Moda", "Didot", Georgia, serif;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(var(--muted));
+}
+
+/* ---- chrome ---- */
+.panel {
+  background:
+    linear-gradient(rgb(var(--panel)), rgb(var(--panel)));
+  border: 1px solid rgb(var(--rule));
+  border-radius: 14px;
+}
+
+.hairline {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    rgb(var(--rule)) 0%,
+    rgb(var(--rule)) 60%,
+    transparent 100%
+  );
+}
+
+:where(button, a, input, select, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--lab-oa));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--rule));
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
