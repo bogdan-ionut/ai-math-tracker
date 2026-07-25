@@ -302,10 +302,11 @@ class TestConfig:
     def test_queries_load_and_include_accounts(self):
         from scripts.automation.query_builder import build_queries
 
-        ids = [q.id for q in build_queries()]
-        assert "explicit-ai-solution" in ids
-        assert "disputes-and-corrections" in ids
-        assert any(i.startswith("account-") for i in ids)
+        built = build_queries()
+        families = {q.family for q in built}
+        assert "explicit-ai-solution" in families
+        assert "disputes-and-corrections" in families
+        assert any(q.id.startswith("account-") for q in built)
 
     def test_no_secrets_in_config(self):
         """Config may *name* the env vars it needs; it must not contain a value

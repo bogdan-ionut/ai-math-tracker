@@ -32,7 +32,9 @@ class TestBuilder:
     def test_every_enabled_family_builds(self, queries):
         tax = load_taxonomy()
         enabled = {f["id"] for f in tax["families"] if f.get("enabled", True)}
-        assert enabled <= {q.id for q in queries}
+        # A family may ship as several shards (K10 OR-term cap), so it is the
+        # family, not the query id, that must be present.
+        assert enabled <= {q.family for q in queries}
 
     def test_ids_are_unique(self, queries):
         ids = [q.id for q in queries]
@@ -90,9 +92,11 @@ class TestMatching:
         assert not query_matches(acct, text, author=None)
 
     def test_quoted_phrase_requires_the_phrase(self, queries):
-        q = next(x for x in queries if x.id == "formal-verification")
-        assert query_matches(q, "the result was verified in Lean by GPT")
-        assert not query_matches(q, "verified the lean startup methodology with AI")
+        fv = [x for x in queries if x.family == "formal-verification"]
+        assert any(query_matches(q, "the result was verified in Lean by GPT") for q in fv)
+        assert not any(
+            query_matches(q, "verified the lean startup methodology with AI") for q in fv
+        )
 
     def test_whole_word_matching(self, queries):
         """'AI' must not match inside 'said' or 'certain'."""

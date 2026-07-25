@@ -25,6 +25,27 @@ CONFIG = ROOT / "config" / "twitter_discovery.json"
 
 MAX_QUERY_CHARS = 1000  # probe accepted 788 without error; stay under a round number
 
+# K10. TwitterAPI.io silently returns **zero results** — no error, HTTP 200 —
+# once a query carries 37 or more OR-terms in total. Measured, not inferred:
+# a term-by-term walk returned 20 results at every total from 10 to 36 and
+# exactly nothing at 37, and splitting that same 37 evenly across two groups
+# (10 AND 27) fails identically, so the cap is on the query total rather than
+# on any single group. The rule reproduces all 14 production queries, including
+# `named-systems` at exactly 37.
+#
+# This is what emptied six of fourteen queries in production for weeks. It is
+# invisible by construction: the failure looks exactly like "nobody posted
+# about this today".
+MAX_OR_TERMS = 34   # measured ceiling 36; two terms of margin
+
+
+def count_or_terms(query: str) -> int:
+    return sum(len([t for t in m.group(1).split(" OR ") if t.strip()])
+               for m in _GROUP_RE.finditer(query))
+
+
+_GROUP_RE = re.compile(r"\(([^()]*)\)")
+
 
 @dataclass
 class BuiltQuery:
@@ -38,6 +59,8 @@ class BuiltQuery:
     routes_to: str | None = None
     groups: list[list[str]] = field(default_factory=list)   # for offline matching
     negatives: list[str] = field(default_factory=list)
+    shard_of: str | None = None      # set when split to fit the OR-term cap
+    over_cap: bool = False           # could not be made to fit — must never ship
 
     def to_dict(self) -> dict:
         return {
@@ -46,7 +69,55 @@ class BuiltQuery:
             "maxResults": self.max_results,
             "expectedPrecision": self.expected_precision,
             "routesTo": self.routes_to,
+            "shardOf": self.shard_of,
+            "orTerms": count_or_terms(self.query),
         }
+
+
+def split_for_term_cap(bq: BuiltQuery, cap: int = MAX_OR_TERMS) -> list[BuiltQuery]:
+    """Split a query that exceeds the OR-term cap into equivalent shards.
+
+    `(A) (B)` with B too large becomes `(A) (b1…bk)`, `(A) (bk+1…)`, … The union
+    of the shards is exactly the original query, because a disjunction
+    distributes over the conjunction:
+
+        (A) AND (b1 OR b2)  ≡  [(A) AND b1] OR [(A) AND b2]
+
+    So this costs extra API calls and loses nothing. That matters: the
+    alternative — dropping terms until the query fits — would silently narrow
+    what we look for, which is the same class of invisible loss as K10 itself.
+
+    Only the largest group is split. If that is not enough to fit (which no
+    current query needs), the shard is returned over-cap rather than quietly
+    truncated, and `over_cap` marks it so a test can fail loudly.
+    """
+    if not bq.groups or count_or_terms(bq.query) <= cap:
+        return [bq]
+
+    biggest = max(range(len(bq.groups)), key=lambda i: len(bq.groups[i]))
+    others = sum(len(g) for i, g in enumerate(bq.groups) if i != biggest)
+    room = cap - others
+    grp = bq.groups[biggest]
+
+    if room < 1:
+        bq.over_cap = True
+        return [bq]
+
+    chunks = [grp[i:i + room] for i in range(0, len(grp), room)]
+    tail = _GROUP_RE.sub("", bq.query).split()
+
+    shards: list[BuiltQuery] = []
+    for n, chunk in enumerate(chunks, start=1):
+        groups = [chunk if i == biggest else g for i, g in enumerate(bq.groups)]
+        query = " ".join([_or_group(g) for g in groups] + tail)
+        shards.append(BuiltQuery(
+            id=f"{bq.id}#{n}", family=bq.family, tier=bq.tier, query=query,
+            purpose=f"{bq.purpose} (shard {n}/{len(chunks)})",
+            max_results=bq.max_results, expected_precision=bq.expected_precision,
+            routes_to=bq.routes_to, groups=groups, negatives=bq.negatives,
+            shard_of=bq.id, over_cap=count_or_terms(query) > cap,
+        ))
+    return shards
 
 
 def load_taxonomy(path: Path | None = None) -> dict:
@@ -119,14 +190,14 @@ def build_queries(tax: dict | None = None) -> list[BuiltQuery]:
                 parts = [_or_group(g) for g in groups]
                 query = (" ".join(parts) + suffix).strip()
 
-        out.append(BuiltQuery(
+        out.extend(split_for_term_cap(BuiltQuery(
             id=fam["id"], family=fam["id"], tier=tier, query=query,
             purpose=fam.get("purpose", ""),
             max_results=int(tier_cfg.get("maxResultsPerRun", 20)),
             expected_precision=fam.get("expectedPrecision", "unknown"),
             routes_to=fam.get("routesTo"),
             groups=groups, negatives=negatives,
-        ))
+        )))
 
     accounts = tax.get("trustedAccounts", {})
     tpl = accounts.get("queryTemplate", "from:{handle}")
