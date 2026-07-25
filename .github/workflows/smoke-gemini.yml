@@ -1,0 +1,52 @@
+name: Smoke test — Gemini extraction
+
+# Manual, read-only. Confirms the key works, the pinned model answers, and a real
+# observation extracts into valid structured output. Never prints the key.
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: "Post text to extract (leave blank for a built-in sample)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-gemini
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements.txt
+
+      - name: Validate secret is present
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "${GEMINI_API_KEY}" ]; then
+            echo "::error::GEMINI_API_KEY is not set in repository secrets"; exit 1
+          fi
+          echo "GEMINI_API_KEY is present (length ${#GEMINI_API_KEY})"
+
+      - name: Extract a real observation
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PROBE_TEXT: ${{ inputs.text }}
+        run: python -m scripts.automation.smoke_gemini
+
+      - name: Confirm read-only
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::smoke test modified the working tree"; git status --porcelain; exit 1
+          fi
+          echo "Working tree clean."
