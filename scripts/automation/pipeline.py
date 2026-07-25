@@ -25,7 +25,7 @@ from scripts.automation.matching import (  # noqa: E402
     load_registry,
     match_observation,
 )
-from scripts.automation.merge import apply_decision, decide  # noqa: E402
+from scripts.automation.merge import apply_decision, resolve  # noqa: E402
 from scripts.automation.models import ProcessingState, utc_now_iso  # noqa: E402
 from scripts.automation.policy import assert_registry_untouched  # noqa: E402
 from scripts.automation.review import summarize  # noqa: E402
@@ -98,7 +98,7 @@ def run(dry_run: bool = False, judge_client: StructuredModel | None = None,
             _judge_state["client"] = None
         return _judge_state["client"]
 
-    judge_calls = judge_failures = 0
+    judge_calls = judge_failures = judge_deferred = 0
     decisions: dict[str, int] = {}
     totals = {"candidatesCreated": 0, "candidatesUpdated": 0, "claimsAdded": 0,
               "sourcesAttached": 0, "reviewsCreated": 0}
@@ -108,30 +108,45 @@ def run(dry_run: bool = False, judge_client: StructuredModel | None = None,
         outcome = match_observation(o, registry, shortlist_size=shortlist_size)
 
         verdict = None
-        if outcome.needs_judge and judge_calls < max_judge:
-            client = get_judge()
-            if client is not None:
-                judge_calls += 1
-                verdict, err = ask_judge(client, template,
-                                         build_judge_payload(o, outcome, registry))
-                if err:
-                    judge_failures += 1
-            # no client (no key, or dry run) → verdict stays None, which
-            # `decide` turns into insufficient_information rather than a guess
+        judge_status = "not_needed"
+        if outcome.needs_judge:
+            if judge_calls >= max_judge:
+                judge_status = "budget_exhausted"
+            else:
+                client = get_judge()
+                if client is None:
+                    judge_status = "unavailable"
+                else:
+                    judge_calls += 1
+                    verdict, err = ask_judge(client, template,
+                                             build_judge_payload(o, outcome, registry))
+                    if err:
+                        judge_failures += 1
+                        judge_status = "failed"
+                    else:
+                        judge_status = "ok"
 
-        decision = decide(outcome, verdict)
-        decisions[decision] = decisions.get(decision, 0) + 1
+        resolution = resolve(outcome, verdict, judge_status=judge_status)
+        decisions[resolution.decision] = decisions.get(resolution.decision, 0) + 1
 
         candidates, queue, report = apply_decision(
-            decision, o, outcome, candidates, queue, judge=verdict, now=now
+            resolution, o, outcome, candidates, queue, now=now
         )
         for k in totals:
             totals[k] += getattr(report, k)
 
         rec = by_id[o["id"]]
+        if resolution.deferred:
+            # We never asked. Leave the observation untouched so the next run
+            # retries it — recording a conclusion here would make an operational
+            # gap look like a judgement about the post.
+            judge_deferred += 1
+            by_id[o["id"]] = rec
+            continue
+
         rec["matchMethod"] = outcome.method
-        rec["problemRef"] = outcome.matched_id
-        rec["decision"] = decision
+        rec["problemRef"] = resolution.matched_id
+        rec["decision"] = resolution.decision
         rec["status"] = "merged" if report.candidatesCreated or report.candidatesUpdated else "review"
         by_id[o["id"]] = rec
 
@@ -142,6 +157,7 @@ def run(dry_run: bool = False, judge_client: StructuredModel | None = None,
         "ok": True, "dryRun": dry_run,
         "observationsReady": len(ready),
         "judgeCalls": judge_calls, "judgeFailures": judge_failures,
+        "judgeDeferred": judge_deferred,
         "judgeBudget": max_judge,
         "judgeUnavailable": _judge_state["error"],
         "decisions": decisions,

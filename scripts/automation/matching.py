@@ -71,6 +71,7 @@ class MatchOutcome:
     shortlist: list[Candidate] = field(default_factory=list)
     needs_judge: bool = False
     conflict: bool = False
+    conflicting_ids: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -80,6 +81,7 @@ class MatchOutcome:
             "shortlist": [c.to_dict() for c in self.shortlist],
             "needsJudge": self.needs_judge,
             "conflict": self.conflict,
+            "conflictingIds": self.conflicting_ids,
             "notes": self.notes,
         }
 
@@ -149,7 +151,7 @@ def match_observation(
 
     if len(id_hits) == 1:
         return MatchOutcome("identifier", id_hits[0].record_id, id_hits[0:1],
-                            needs_judge=False,
+                            needs_judge=False, conflicting_ids=sorted(conflicts),
                             notes=[f"deterministic identifier match: {id_hits[0].reason}"])
     if len(id_hits) > 1:
         # Two records claiming the same identifier is a data problem, not a
@@ -175,7 +177,8 @@ def match_observation(
 
     if len(alias_hits) == 1:
         return MatchOutcome("alias", alias_hits[0].record_id, alias_hits[0:1],
-                            needs_judge=False, notes=[alias_hits[0].reason])
+                            needs_judge=False, conflicting_ids=sorted(conflicts),
+                            notes=[alias_hits[0].reason])
 
     # --- 3. lexical shortlist ---------------------------------------------
     scored: list[Candidate] = []
@@ -208,9 +211,11 @@ def match_observation(
     if (len(scored) >= 1 and scored[0].score >= LEXICAL_CERTAIN and not alias_hits
             and (len(scored) == 1 or scored[0].score - scored[1].score >= LEXICAL_MARGIN)):
         return MatchOutcome("lexical", scored[0].record_id, shortlist, needs_judge=False,
+                            conflicting_ids=sorted(conflicts),
                             notes=notes + [f"unambiguous lexical match ({scored[0].score:.0f})"])
 
-    return MatchOutcome("lexical", None, shortlist, needs_judge=True, notes=notes)
+    return MatchOutcome("lexical", None, shortlist, needs_judge=True,
+                        conflicting_ids=sorted(conflicts), notes=notes)
 
 
 def build_judge_payload(obs: dict, outcome: MatchOutcome, registry: list[dict]) -> dict:

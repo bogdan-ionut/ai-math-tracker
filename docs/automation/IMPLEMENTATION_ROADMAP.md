@@ -16,8 +16,8 @@ further defects in the judge stage.
 | 4 | Safe merge engine and review queue | **completed** |
 | 5 | Scheduled GitHub Actions workflow | **completed** |
 | **5.1** | **Truthfulness and CI** | **completed** |
-| **5.2** | **Make the judge actually decide** | **planned — next** |
-| **5.3** | **Retrieval correctness** | planned |
+| **5.2** | **Make the judge actually decide** | **completed** |
+| **5.3** | **Retrieval correctness** | **planned — next** |
 | **5.4** | **Data contracts, cost and identity** | planned |
 | **5.5** | **Real no-write end-to-end → gate to live writes** | planned |
 | 6 | Multi-source + candidate entity resolution | planned |
@@ -74,7 +74,7 @@ the code. A deliberate `data/results.json` edit inside a run is caught by `chang
 
 ---
 
-## Sprint 5.2 — Make the judge actually decide · `planned`
+## Sprint 5.2 — Make the judge actually decide · `completed`
 
 **Objective.** The judge currently costs money and produces nothing that survives. Fix that,
 and stop conflating "we did not ask" with "it could not tell".
@@ -109,9 +109,18 @@ schema. No review reason is declared and unemitted.
 
 **Risk.** Touching the decision path. Mitigated by the tests above landing first.
 
+**Delivered.** All six deliverables, plus one structural change the plan did not anticipate:
+`decide() -> str` became a `Resolution` dataclass. A bare string cannot express *"deferred —
+mutate nothing"* as distinct from *"concluded"*, and deliverable 3 requires exactly that
+distinction. `identifier_conflict` was declared but unemitted and would have failed the same
+D39 invariant as the other three, so rather than delete it, it was given a real emitter: an
+alias or lexical match while explicit identifiers disagree with another record.
+
+`test_judge.py` (28 tests) landed first and all 28 failed against the old code. Suite: 274.
+
 ---
 
-## Sprint 5.3 — Retrieval correctness · `planned`
+## Sprint 5.3 — Retrieval correctness · `planned — next`
 
 **Objective.** Retrieve what we believe we retrieve. Currently a busy query silently loses
 matches, and six of fourteen queries return nothing for reasons unknown.

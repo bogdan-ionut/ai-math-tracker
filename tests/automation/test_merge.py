@@ -12,7 +12,7 @@ import pytest
 
 from scripts.automation.matching import Candidate as MatchCandidate
 from scripts.automation.matching import MatchOutcome
-from scripts.automation.merge import apply_decision, decide
+from scripts.automation.merge import Resolution, apply_decision, resolve
 from scripts.automation.policy import (
     PolicyViolation,
     assert_no_editorial_write,
@@ -126,79 +126,80 @@ class TestCorroborationGate:
 
 # ================================================================ decisions
 
-class TestDecide:
+class TestResolve:
     def test_identifier_match_decides_itself(self):
-        assert decide(outcome("identifier")) == "same_problem_new_claim"
+        assert resolve(outcome("identifier")).decision == "same_problem_new_claim"
 
     def test_alias_match_decides_itself(self):
-        assert decide(outcome("alias")) == "same_problem_new_claim"
+        assert resolve(outcome("alias")).decision == "same_problem_new_claim"
 
     def test_no_match_is_distinct(self):
-        assert decide(outcome("none", matched=None)) == "distinct_problem"
+        assert resolve(outcome("none", matched=None)).decision == "distinct_problem"
 
-    def test_registry_conflict_never_guesses(self):
-        assert decide(outcome("conflict", matched=None, conflict=True)) == "insufficient_information"
+    def test_registry_conflict_is_reported_as_one(self):
+        r = resolve(outcome("conflict", matched=None, conflict=True))
+        assert r.forced_review == "registry_conflict"
 
     def test_judge_failure_never_guesses(self):
         """A missing judge verdict must not fall through to a merge."""
-        assert decide(outcome("lexical", None, needs_judge=True), judge=None) == \
-            "insufficient_information"
+        r = resolve(outcome("lexical", None, needs_judge=True), None, judge_status="failed")
+        assert r.forced_review == "judge_failed" and r.matched_id is None
 
     def test_judge_verdict_is_used_when_present(self):
-        d = decide(outcome("lexical", None, needs_judge=True),
-                   judge={"decision": "same_problem_new_claim", "requiresHumanReview": False})
-        assert d == "same_problem_new_claim"
+        out = outcome("lexical", None, needs_judge=True)
+        out.shortlist = [MatchCandidate("erdos-728", "E", 80.0, "lexical", "why")]
+        r = resolve(out, {"decision": "same_problem_new_claim", "confidence": 0.9,
+                          "requiresHumanReview": False, "matchedProblemId": "erdos-728"},
+                    judge_status="ok")
+        assert r.decision == "same_problem_new_claim" and r.matched_id == "erdos-728"
 
 
 # ================================================================ handlers
 
 class TestHandlers:
     def test_new_claim_creates_candidate(self):
-        cands, rev, rep = apply_decision("same_problem_new_claim", obs(), outcome(), [], [], now=NOW)
+        cands, rev, rep = apply_decision(Resolution("same_problem_new_claim", "erdos-728"), obs(), outcome(), [], [], now=NOW)
         assert rep.candidatesCreated == 1 and len(cands) == 1
         assert cands[0]["problemRef"] == "erdos-728"
         assert cands[0]["status"] == "pending", "a candidate is never born promoted"
 
     def test_uncorroborated_goes_to_review_not_candidates(self):
-        cands, rev, rep = apply_decision(
-            "distinct_problem", obs(ext={}), outcome("none", None), [], [], now=NOW
+        cands, rev, rep = apply_decision(Resolution("distinct_problem", None), obs(ext={}), outcome("none", None), [], [], now=NOW
         )
         assert cands == [] and rep.candidatesCreated == 0
         assert rep.reviewsCreated == 1 and rev[0]["reason"] == "no_corroboration"
 
     def test_low_confidence_goes_to_review(self):
-        _, rev, rep = apply_decision("distinct_problem", obs(conf=0.1), outcome("none", None),
+        _, rev, rep = apply_decision(Resolution("distinct_problem", None), obs(conf=0.1), outcome("none", None),
                                      [], [], now=NOW)
         assert rev[0]["reason"] == "low_confidence" and rep.candidatesCreated == 0
 
     def test_conflicting_claim_preserves_both_and_creates_review(self):
-        cands, rev, rep = apply_decision("same_problem_conflicting_claim", obs(), outcome(),
+        cands, rev, rep = apply_decision(Resolution("same_problem_conflicting_claim", "erdos-728"), obs(), outcome(),
                                          [], [], now=NOW)
         assert cands == [], "a conflict must not silently create or edit anything"
         assert rev[0]["reason"] == "conflicting_claim"
         assert "preserved" in rev[0]["detail"]
 
     def test_related_problem_does_not_merge(self):
-        cands, rev, _ = apply_decision("related_problem", obs(), outcome(), [], [], now=NOW)
+        cands, rev, _ = apply_decision(Resolution("related_problem", "erdos-728"), obs(), outcome(), [], [], now=NOW)
         assert cands == [] and rev[0]["reason"] == "related_problem"
 
     def test_duplicate_source_is_a_no_op(self):
-        cands, rev, rep = apply_decision("same_source_duplicate", obs(), outcome(), [], [], now=NOW)
+        cands, rev, rep = apply_decision(Resolution("same_source_duplicate", "erdos-728"), obs(), outcome(), [], [], now=NOW)
         assert cands == [] and rev == [] and rep.reviewsCreated == 0
 
     def test_insufficient_information_reviews(self):
-        _, rev, _ = apply_decision("insufficient_information", obs(), outcome(), [], [], now=NOW)
+        _, rev, _ = apply_decision(Resolution("insufficient_information", "erdos-728"), obs(), outcome(), [], [], now=NOW)
         assert rev[0]["reason"] == "insufficient_information"
 
     def test_unknown_decision_is_reviewed_not_ignored(self):
-        _, rev, rep = apply_decision("something_new", obs(), outcome(), [], [], now=NOW)
+        _, rev, rep = apply_decision(Resolution("something_new", "erdos-728"), obs(), outcome(), [], [], now=NOW)
         assert rep.reviewsCreated == 1 and rev[0]["reason"] == "ambiguous_identity"
 
     def test_second_observation_extends_rather_than_duplicates(self):
-        cands, _, _ = apply_decision("same_problem_new_claim", obs(oid="o1"), outcome(), [], [], now=NOW)
-        cands, _, rep = apply_decision(
-            "same_problem_new_claim",
-            obs(oid="o2", url="https://x.com/b/status/2", model="Gemini"),
+        cands, _, _ = apply_decision(Resolution("same_problem_new_claim", "erdos-728"), obs(oid="o1"), outcome(), [], [], now=NOW)
+        cands, _, rep = apply_decision(Resolution("same_problem_new_claim", "erdos-728"), obs(oid="o2", url="https://x.com/b/status/2", model="Gemini"),
             outcome(), cands, [], now=NOW,
         )
         assert len(cands) == 1, "same problem must not create a second candidate"
@@ -206,9 +207,8 @@ class TestHandlers:
         assert len(cands[0]["claims"]) == 2 and len(cands[0]["sources"]) == 2
 
     def test_identical_claim_is_not_duplicated(self):
-        cands, _, _ = apply_decision("same_problem_same_claim", obs(oid="o1"), outcome(), [], [], now=NOW)
-        cands, _, rep = apply_decision(
-            "same_problem_same_claim", obs(oid="o2", url="https://x.com/b/status/2"),
+        cands, _, _ = apply_decision(Resolution("same_problem_same_claim", "erdos-728"), obs(oid="o1"), outcome(), [], [], now=NOW)
+        cands, _, rep = apply_decision(Resolution("same_problem_same_claim", "erdos-728"), obs(oid="o2", url="https://x.com/b/status/2"),
             outcome(), cands, [], now=NOW,
         )
         assert len(cands[0]["claims"]) == 1, "the same assertion twice is still one claim"
@@ -219,26 +219,26 @@ class TestHandlers:
 
 class TestIdempotency:
     def test_rerunning_changes_nothing(self):
-        c1, r1, _ = apply_decision("same_problem_new_claim", obs(), outcome(), [], [], now=NOW)
-        c2, r2, rep = apply_decision("same_problem_new_claim", obs(), outcome(), c1, r1, now=NOW)
+        c1, r1, _ = apply_decision(Resolution("same_problem_new_claim", "erdos-728"), obs(), outcome(), [], [], now=NOW)
+        c2, r2, rep = apply_decision(Resolution("same_problem_new_claim", "erdos-728"), obs(), outcome(), c1, r1, now=NOW)
         assert c1 == c2 and r1 == r2
         assert rep.candidatesCreated == 0 and rep.claimsAdded == 0
 
     def test_review_entries_are_not_duplicated(self):
-        _, r1, _ = apply_decision("insufficient_information", obs(), outcome(), [], [], now=NOW)
-        _, r2, rep = apply_decision("insufficient_information", obs(), outcome(), [], r1, now=NOW)
+        _, r1, _ = apply_decision(Resolution("insufficient_information", "erdos-728"), obs(), outcome(), [], [], now=NOW)
+        _, r2, rep = apply_decision(Resolution("insufficient_information", "erdos-728"), obs(), outcome(), [], r1, now=NOW)
         assert len(r2) == 1 and rep.reviewsCreated == 0
 
     def test_resolved_review_is_not_reopened(self):
-        _, r1, _ = apply_decision("insufficient_information", obs(), outcome(), [], [], now=NOW)
+        _, r1, _ = apply_decision(Resolution("insufficient_information", "erdos-728"), obs(), outcome(), [], [], now=NOW)
         r1[0]["status"] = "resolved"
-        _, r2, rep = apply_decision("insufficient_information", obs(), outcome(), [], r1, now=NOW)
+        _, r2, rep = apply_decision(Resolution("insufficient_information", "erdos-728"), obs(), outcome(), [], r1, now=NOW)
         assert r2[0]["status"] == "resolved", "a human already answered this"
         assert rep.reviewsCreated == 0
 
     def test_different_reason_same_subject_gets_its_own_entry(self):
-        _, r1, _ = apply_decision("insufficient_information", obs(), outcome(), [], [], now=NOW)
-        _, r2, _ = apply_decision("related_problem", obs(), outcome(), [], r1, now=NOW)
+        _, r1, _ = apply_decision(Resolution("insufficient_information", "erdos-728"), obs(), outcome(), [], [], now=NOW)
+        _, r2, _ = apply_decision(Resolution("related_problem", "erdos-728"), obs(), outcome(), [], r1, now=NOW)
         assert len(r2) == 2
 
 
@@ -284,19 +284,33 @@ class TestRegistryIsUntouchable:
             "insufficient_information", "totally_unknown_decision",
         ):
             cands, queue, _ = apply_decision(
-                decision, obs(oid=f"obs_{decision}"), outcome(), cands, queue, now=NOW
+                Resolution(decision, "erdos-728"),
+                obs(oid=f"obs_{decision}"), outcome(), cands, queue, now=NOW,
+            )
+
+        # and the non-decision resolutions
+        for res in (
+            Resolution("deferred", None, deferred=True),
+            Resolution("insufficient_information", None, forced_review="judge_failed"),
+            Resolution("insufficient_information", None, forced_review="registry_conflict"),
+            Resolution("same_problem_new_claim", "erdos-728", forced_review="judge_uncertain"),
+            Resolution("same_problem_new_claim", "erdos-728", forced_review="identifier_conflict"),
+        ):
+            cands, queue, _ = apply_decision(
+                res, obs(oid=f"obs_{res.forced_review or 'deferred'}"),
+                outcome(), cands, queue, now=NOW,
             )
 
         assert results.read_bytes() == before
 
     def test_no_candidate_carries_an_editorial_field(self):
-        cands, _, _ = apply_decision("same_problem_new_claim", obs(), outcome(), [], [], now=NOW)
+        cands, _, _ = apply_decision(Resolution("same_problem_new_claim", "erdos-728"), obs(), outcome(), [], [], now=NOW)
         blob = json.dumps(cands)
         for banned in ("impact", "assessment", "auditNotes", "auditedAt"):
             assert banned not in blob, f"{banned} must never appear on a candidate"
 
     def test_candidate_status_is_never_audited(self):
-        cands, _, _ = apply_decision("same_problem_new_claim", obs(), outcome(), [], [], now=NOW)
+        cands, _, _ = apply_decision(Resolution("same_problem_new_claim", "erdos-728"), obs(), outcome(), [], [], now=NOW)
         assert all(c["status"] in ("pending", "promoted", "rejected") for c in cands)
         assert all(c["status"] != "audited" for c in cands)
 
@@ -340,10 +354,11 @@ class TestPipelineEndToEnd:
         assert st.read_json(st.candidates_path(), []) == []
         assert r["reviewOpenByReason"].get("no_corroboration") == 1
 
-    def test_ambiguous_and_uncorroborated_is_still_safe(self, tmp_path, monkeypatch):
-        """A vague name shares tokens with real titles, so it goes to the judge
-        rather than the gate. With no judge available it must still end in
-        review — a different reason, the same refusal to guess."""
+    def test_ambiguous_without_a_judge_is_deferred_not_concluded(self, tmp_path, monkeypatch):
+        """A vague name shares tokens with real titles, so it needs the judge.
+        With no judge available the run must change nothing and retry next time —
+        before 5.2 this was filed as `insufficient_information`, which recorded an
+        operational gap as a conclusion about the post."""
         from scripts.automation import pipeline
         st = self._prepare(tmp_path, monkeypatch)
         o = obs(ext={}, name="Some Brand New Conjecture Nobody Has Heard Of")
@@ -353,7 +368,11 @@ class TestPipelineEndToEnd:
         r = pipeline.run(judge_client=None)
         assert r["candidatesCreated"] == 0
         assert st.read_json(st.candidates_path(), []) == []
-        assert sum(r["reviewOpenByReason"].values()) == 1
+        assert r["judgeDeferred"] == 1
+        assert sum(r["reviewOpenByReason"].values()) == 0, "deferred must not fill the queue"
+
+        kept = st.read_json(st.observations_path(), [])
+        assert kept[0]["status"] == "extracted", "must remain eligible for the next run"
 
     def test_pipeline_is_idempotent(self, tmp_path, monkeypatch):
         from scripts.automation import pipeline

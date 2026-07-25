@@ -6,7 +6,7 @@
 
 **Last updated:** 2026-07-25
 **Phase:** executing the revised plan
-**Next sprint:** 5.2 — Make the judge actually decide
+**Next sprint:** 5.3 — Retrieval correctness
 **Live writes:** 🔴 **disabled** (`dryRunOnSchedule: true`) — gate is Sprint 5.5
 
 ---
@@ -33,9 +33,9 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (232) — but nothing gates a merge |
+| Local test coverage | good (274), and CI gates every merge |
 | Retrieval correctness | **defective** — a busy query silently loses matches |
-| Judge stage | **largely decorative** — its conclusion is discarded |
+| Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | JSON-parseable only, not model-validated |
 | Empirical calibration | **none** — the scheduled dry run has never exercised Gemini |
 
@@ -48,11 +48,11 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 | # | Defect | Severity | Sprint |
 |---|---|---|---|
-| **A1** | Judge's `matchedProblemId` never read → every judge-resolved observation loses its registry link | 🔴 critical | 5.2 |
-| **A2** | `requiresHumanReview` discarded — both branches of the `if` are identical | 🟠 major | 5.2 |
-| **A3** | Judge *unavailability* recorded as the judge's *conclusion*, and terminal | 🟠 major | 5.2 |
-| **A4** | Registry identifier collision detected, then erased into "insufficient_information" | 🟠 major | 5.2 |
-| **A5** | `registry_conflict` / `judge_failed` / `judge_uncertain` declared but never emitted | 🟡 minor | 5.2 |
+| ~~A1~~ | ~~Judge's `matchedProblemId` never read~~ | ✅ | closed 5.2 |
+| ~~A2~~ | ~~`requiresHumanReview` discarded~~ | ✅ | closed 5.2 |
+| ~~A3~~ | ~~Judge *unavailability* recorded as its *conclusion*~~ | ✅ | closed 5.2 |
+| ~~A4~~ | ~~Registry identifier collision erased~~ | ✅ | closed 5.2 |
+| ~~A5~~ | ~~Four review reasons declared but never emitted~~ | ✅ | closed 5.2 |
 | **R2** | No server-side `since:`/`until:` — lookback applied after the API picked 20 | 🔴 critical | 5.3 |
 | **R1** | Scheduled dry run skips extraction and pipeline entirely | 🔴 critical | 5.5 |
 | **R5** | Matching never searches the candidate store | 🟠 major | 6 |
@@ -103,15 +103,45 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 248 / 248 (`python -m pytest`) — no network, no API keys.
+**Passing:** 274 / 274 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
-**Known coverage gap:** the judge path is never exercised end to end. `test_merge.outcome()`
-defaults to a deterministic identifier match, which is precisely why A1–A4 survived.
+**Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
+was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
+every one of 232 tests took the branch that has no judge in it.
 **Build health:** `build_data.py` ✅ · `pnpm build` ✅ · live site ✅ · registry untouched ✅
 
 ---
 
 ## Completed since the re-plan
+
+### Sprint 5.2 — Make the judge actually decide ✅
+
+`test_judge.py` was written first, 28 tests, all failing. Then:
+
+- **A1 — the judge's answer is used.** `matchedProblemId` now sets `problemRef` on the
+  candidate and on the review entry, but **only if the id appears in the shortlist the judge
+  was actually shown**. An invented id is rejected with a note and routed to review rather
+  than trusted; the model cannot introduce a registry link out of nothing.
+- **A2 — `requiresHumanReview` is honoured**, alongside a confidence floor (0.7). Either one
+  routes to `judge_uncertain` instead of creating a candidate, and the review entry keeps the
+  judge's decision and confidence so a curator sees what was overridden.
+- **A3 — unavailability is no longer a conclusion.** No key, exhausted budget ⇒ the
+  observation is **deferred**: nothing is mutated, it stays `extracted`, and the next run
+  retries it. A transport *error* is different again and surfaces as `judge_failed`. Only a
+  real "cannot tell" verdict is terminal. The run summary reports `judgeDeferred`.
+- **A4 — a registry collision surfaces as `registry_conflict`**, carrying the colliding ids,
+  and never reaches the judge. One identifier claiming two curated records is our data bug,
+  not an ambiguity for a model to arbitrate.
+- **A5 — no dead review reasons.** `identifier_conflict` was also declared and unemitted;
+  rather than delete it, it now has a real emitter (an alias or lexical match while explicit
+  identifiers disagree). A test enforces invariant D39 going forward.
+
+The one structural change: `decide() -> str` became a `Resolution` dataclass. A string cannot
+carry "deferred, mutate nothing" as distinct from "concluded", and A3 needs exactly that.
+
+> Verified end to end against a stubbed judge: a confident verdict merges with the right
+> `problemRef`; an invented id, a self-flagged verdict and a transport error each route to
+> the correct queue reason; an absent key defers and leaves the record untouched.
 
 ### Sprint 5.1 — Truthfulness and CI ✅
 
@@ -151,7 +181,7 @@ Consequence worth stating: `disputes-and-corrections` — added precisely becaus
 
 ## Next task
 
-**Sprint 5.2 — Make the judge actually decide.** The largest correctness gain per line
-changed: A1–A5 in the defect table. Start with `tests/automation/test_judge.py`, because the
-existing `outcome()` helper defaults to a deterministic identifier match and that is exactly
-why these defects survived.
+**Sprint 5.3 — Retrieval correctness.** R2, R11 and K10. Open with the K10 differential
+probe — stripping one element at a time from a failing query — because the answer decides
+whether the six dead queries need rewriting or whether we are hitting an undocumented
+backend limit that also constrains the fix for R2.
