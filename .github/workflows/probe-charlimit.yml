@@ -1,0 +1,29 @@
+name: Probe — query character limit
+# K10 part two. The differential probe's OR-term reading was falsified by a
+# live run: a 34-term query returns results and a 32-term one does not, while
+# character length separates every observation cleanly. This sweeps length with
+# the terms held broad, so a drop to zero can only be the limit.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements.txt
+      - env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+        run: |
+          python -m scripts.automation.probe_charlimit | tee out.txt
+          { echo "### Query character limit"; echo; echo '```'; cat out.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: charlimit-probe
+          path: charlimit_probe.json
+          retention-days: 30
