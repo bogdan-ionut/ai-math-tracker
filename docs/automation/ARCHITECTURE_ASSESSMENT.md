@@ -272,6 +272,15 @@ DST. This must be documented rather than solved.
 avoid the scheduling stampede at :00 (GitHub explicitly warns that on-the-hour crons are
 delayed under load).
 
+### 2.9b Model selection
+
+Both Gemini stages are pinned to **`gemini-3.6-flash`** (user decision, 2026-07-25),
+recorded in `config/automation.json` under `extraction.model` and `judge.model`, and
+asserted by a test so it cannot drift silently. Flash is the right tier here: extraction is
+a structured-output task over a single short post, and the judge sees a shortlist of at
+most five candidates. The model id is written onto every extraction record so outputs can
+be reprocessed when it changes.
+
 ### 2.10 Cost
 
 Rough envelope at the proposed 14 queries/day:

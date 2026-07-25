@@ -1,0 +1,109 @@
+name: Smoke test — TwitterAPI.io connectivity
+
+# Manual only. Confirms the API key works and the response shape matches what the
+# client expects. Writes nothing to the repository and never prints the key, the
+# request headers, or tweet content.
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: "Search query to probe with"
+        required: false
+        default: "AlphaProof"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-twitter
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Validate secret is present
+        env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+        run: |
+          if [ -z "${TWITTERAPI_IO_KEY}" ]; then
+            echo "::error::TWITTERAPI_IO_KEY is not set in repository secrets"
+            exit 1
+          fi
+          echo "TWITTERAPI_IO_KEY is present (length ${#TWITTERAPI_IO_KEY})"
+
+      - name: Probe the search endpoint
+        env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+          PROBE_QUERY: ${{ inputs.query }}
+        run: |
+          python - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, ".")
+          from scripts.automation.twitter import TwitterApiClient, TwitterApiError
+          from scripts.automation.ingest import normalise_tweet, to_observation
+          from scripts.automation.models import utc_now_iso
+
+          query = os.environ.get("PROBE_QUERY") or "AlphaProof"
+          try:
+              client = TwitterApiClient(timeout=20, max_retries=2)
+              tweets = client.search(query, query_type="Latest", max_pages=1)
+          except TwitterApiError as exc:
+              print(f"::error::TwitterAPI.io call failed: {exc}")
+              raise SystemExit(1)
+
+          now = utc_now_iso()
+          normalised = [normalise_tweet(t, "smoke", now, True) for t in tweets]
+          normalised = [n for n in normalised if n]
+          observations = [to_observation(n, now) for n in normalised]
+          unique = {o.id for o in observations}
+          corroborated = [o for o in observations if o.has_external_identifier()]
+
+          # Report shape and counts only — never tweet text, never the key.
+          print("── TwitterAPI.io smoke test ──────────────────────────")
+          print(f"query                : {query!r}")
+          print(f"api calls            : {client.call_count}")
+          print(f"tweets returned      : {len(tweets)}")
+          print(f"normalised ok        : {len(normalised)}")
+          print(f"unique observations  : {len(unique)}")
+          print(f"with external ids    : {len(corroborated)}")
+          if tweets:
+              print(f"response fields seen : {sorted(tweets[0].keys())[:14]}")
+          if observations:
+              o = observations[0]
+              print(f"sample observation id: {o.id}")
+              print(f"sample author        : @{o.author}")
+              print(f"sample created       : {o.sourceCreatedAt}")
+              print(f"sample external ids  : {o.externalIds or '{}'}")
+              print(f"sample link count    : {len(o.links)}")
+          print("──────────────────────────────────────────────────────")
+
+          if not tweets:
+              print("::warning::Endpoint reachable but returned 0 tweets for this query.")
+          else:
+              missing = [f for f in ("id", "text", "createdAt", "author") if f not in tweets[0]]
+              if missing:
+                  print(f"::warning::Response is missing expected fields: {missing}")
+              else:
+                  print("Response shape matches the client's expectations.")
+          PY
+
+      - name: Confirm nothing was written
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Smoke test modified the working tree — it must be read-only"
+            git status --porcelain
+            exit 1
+          fi
+          echo "Working tree clean — smoke test wrote nothing."

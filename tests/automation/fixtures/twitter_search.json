@@ -1,0 +1,56 @@
+{
+  "tweets": [
+    {
+      "id": "2080088344424583261",
+      "text": "1) Graffiti Conjecture 154 REFUTED. Open for ~40 years. Devin found the counterexample: glue a 50-clique to a 70-edge path (n=120). Proven in Lean: https://t.co/abc",
+      "url": "https://x.com/imjaredz/status/2080088344424583261",
+      "createdAt": "Thu Jul 23 14:02:11 +0000 2026",
+      "conversationId": "2080088344424583261",
+      "likeCount": 1200, "retweetCount": 210, "replyCount": 33, "quoteCount": 8, "viewCount": 99000,
+      "author": {"userName": "imjaredz", "name": "Jared Zoneraich"},
+      "entities": {"urls": [{"url": "https://t.co/abc", "expanded_url": "https://github.com/cognition/graffiti-lean?utm_source=twitter&ref=x"}]}
+    },
+    {
+      "id": "2079183963382284288",
+      "text": "Whoa, GPT 5.6 Sol just found a small counterexample for the Gaussian Moments Conjecture. Preprint: arXiv:2607.16356",
+      "url": "https://twitter.com/octonion/status/2079183963382284288",
+      "createdAt": "Wed Jul 22 09:15:00 +0000 2026",
+      "likeCount": 400, "retweetCount": 60, "replyCount": 12, "quoteCount": 2, "viewCount": 41000,
+      "author": {"userName": "octonion", "name": "Christopher D. Long"},
+      "entities": {"urls": []}
+    },
+    {
+      "id": "2080999000111222333",
+      "text": "RT @imjaredz: 1) Graffiti Conjecture 154 REFUTED. Open for ~40 years.",
+      "url": "https://x.com/someone/status/2080999000111222333",
+      "createdAt": "Thu Jul 23 15:00:00 +0000 2026",
+      "author": {"userName": "someone", "name": "Some One"},
+      "retweeted_tweet": {
+        "id": "2080088344424583261",
+        "text": "1) Graffiti Conjecture 154 REFUTED. Open for ~40 years. Devin found the counterexample: glue a 50-clique to a 70-edge path (n=120). Proven in Lean: https://t.co/abc",
+        "url": "https://x.com/imjaredz/status/2080088344424583261",
+        "createdAt": "Thu Jul 23 14:02:11 +0000 2026",
+        "author": {"userName": "imjaredz", "name": "Jared Zoneraich"},
+        "entities": {"urls": [{"url": "https://t.co/abc", "expanded_url": "https://github.com/cognition/graffiti-lean"}]}
+      }
+    },
+    {
+      "id": "2081000000000000001",
+      "text": "hot take: AI will never do real math. no links, no proof, just vibes",
+      "url": "https://x.com/rando/status/2081000000000000001",
+      "createdAt": "Fri Jul 24 08:00:00 +0000 2026",
+      "author": {"userName": "rando", "name": "Rando"},
+      "entities": {"urls": []}
+    },
+    {
+      "id": "2081000000000000002",
+      "text": "Erdős problem #728 has been resolved — see https://www.erdosproblems.com/728 and the writeup",
+      "url": "https://x.com/erdosproblems/status/2081000000000000002",
+      "createdAt": "Fri Jul 24 09:30:00 +0000 2026",
+      "author": {"userName": "erdosproblems", "name": "Erdos Problems"},
+      "entities": {"urls": [{"url": "https://t.co/xyz", "expanded_url": "https://www.erdosproblems.com/728"}]}
+    }
+  ],
+  "has_next_page": false,
+  "next_cursor": ""
+}

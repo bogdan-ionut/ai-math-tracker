@@ -1,0 +1,52 @@
+{
+  "$comment": "Runtime configuration for the discovery pipeline. Values here are safe to publish — no secrets. Secrets come only from the environment (TWITTERAPI_IO_KEY, GEMINI_API_KEY).",
+  "version": 1,
+
+  "ingestion": {
+    "lookbackHours": 30,
+    "$lookbackComment": "Deliberately > 24h. The overlap is harmless because deduplication is keyed on the source-native tweet id, and it stops results falling through the gap at a run boundary.",
+    "maxObservationsPerRun": 50,
+    "httpTimeoutSeconds": 20,
+    "maxRetries": 3,
+    "retryBackoffSeconds": 2.0,
+    "storeTweetText": true,
+    "$storeTweetTextComment": "When false, only a SHA-256 of the text is persisted. Text is needed for extraction and reprocessing; set false if republishing third-party text in a public repo becomes a concern."
+  },
+
+  "rawRetention": {
+    "keepDays": 30,
+    "$comment": "Raw per-day files older than this are pruned by the ingest job. Full API payloads are never committed — they go to a short-retention Actions artifact when debugging."
+  },
+
+  "extraction": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash",
+    "promptVersion": "extraction_v1",
+    "timeoutSeconds": 60,
+    "maxCallsPerRun": 50
+  },
+
+  "judge": {
+    "provider": "gemini",
+    "model": "gemini-3.6-flash",
+    "promptVersion": "judge_v1",
+    "timeoutSeconds": 60,
+    "maxCallsPerRun": 15,
+    "shortlistSize": 5
+  },
+
+  "policy": {
+    "requireCorroborationForCandidate": true,
+    "$corroborationComment": "A social-media observation with no external identifier (arXiv / DOI / OEIS / Erdős number / Lean or GitHub artifact) may not become a candidate on its own; it goes to the review queue instead. See ARCHITECTURE_ASSESSMENT.md §2.1.",
+    "minExtractionConfidence": 0.5,
+    "neverAutoWriteFields": [
+      "status",
+      "auditedAt",
+      "impact",
+      "assessment",
+      "confidence",
+      "auditNotes",
+      "provenanceNote"
+    ]
+  }
+}

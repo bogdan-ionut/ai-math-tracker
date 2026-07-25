@@ -6,9 +6,9 @@
 > meaningless daily diffs. See assessment §2.7.
 
 **Last updated:** 2026-07-25
-**Current sprint:** Sprint 0 — Repository assessment and architecture · **completed**
-**Next recommended task:** Sprint 1 — test scaffolding + deterministic ingestion
-**Awaiting:** user decision on the open questions in §6 below
+**Current sprint:** Sprint 1 — Test scaffolding + deterministic ingestion · **completed**
+**Next recommended task:** Sprint 2 — Gemini structured extraction (`gemini-3.6-flash`)
+**Awaiting:** result of the manual TwitterAPI.io smoke test; Q2/Q3 in §6
 
 ---
 
@@ -24,11 +24,34 @@
 - **No production code changed.** `data/results.json`, `scripts/`, `src/` and
   `.github/workflows/` are untouched.
 
+### Sprint 1 — Test scaffolding + deterministic ingestion ✅
+
+- **Test tooling.** `pytest` added via `scripts/requirements-dev.txt`; `pytest.ini` added.
+  The broken `"lint"` script (called an ESLint that was never installed) was **removed**
+  rather than pulling in a toolchain this repo does not otherwise use — K3 closed.
+- **Config.** `config/twitter_queries.json` (14 topical queries + 6 trusted accounts) and
+  `config/automation.json` (lookback, caps, retention, model pinning, policy). Neither
+  contains a credential; a test enforces that.
+- **Modules** under `scripts/automation/`:
+  `urls.py` (canonicalisation, tracking-param stripping, twitter.com→x.com),
+  `identifiers.py` (arXiv / DOI / OEIS / Erdős / GitHub / Lean extraction + conflict
+  detection), `ids.py` (stable, purely derived ids), `models.py` (`RawTweet`,
+  `Observation`, `ProcessingState`), `store.py` (atomic writes, corruption-tolerant
+  reads), `twitter.py` (TwitterAPI.io client behind a `SearchClient` protocol +
+  offline `FixtureSearchClient`), `ingest.py` (orchestration, `--dry-run`).
+- **Tests.** 49 passing, no network, no API keys.
+- **Smoke test.** `.github/workflows/smoke-twitter.yml` — manual only, read-only,
+  prints counts and field names but never the key or tweet text.
+
+Dry-run over the fixture: 100 fetched → **4 unique** after deduplication (the retweet
+collapses onto its original), **3 of 4 carry an external identifier**; the fourth is a
+no-link opinion tweet, which is exactly what the corroboration gate is for.
+
 ---
 
 ## Remaining work
 
-Sprints 1–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`. Nothing started.
+Sprints 2–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 
 ---
 
@@ -46,6 +69,10 @@ Sprints 1–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`. Nothing started.
 | D8 | Two workflows, acyclic: `discover.yml` commits → `deploy-pages.yml` deploys | Deploy has no commit step, so no loop guard is needed (§2.8) |
 | D9 | Cron `20 4 * * *` UTC; DST drift documented, not solved | GitHub Actions cron is UTC-only (§2.9) |
 | D10 | A new **Sprint 6** adds arXiv / erdosproblems / GitHub sources before the optional frontend | Higher-precision sources materially improve D4's corroboration gate |
+| D11 | Gemini pinned to **`gemini-3.6-flash`** for both extraction and judging | User decision, 2026-07-25. Right tier for structured output over one short post and a ≤5-item shortlist; asserted by a test so it cannot drift |
+| D12 | Retweets are attributed to the **original** tweet id | An RT and its source are one signal, not two — deduplication happens before any model call |
+| D13 | `lookbackHours` is overridable per run | Fixture tests must not depend on today's date; also satisfies the brief's "configurable lookback" |
+| D14 | The broken `lint` script was **removed**, not repaired | ESLint was never a dependency; adding a linter is a separate decision, not a side effect of this work |
 
 ---
 
@@ -68,11 +95,11 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 | # | Issue | Blocking? | Plan |
 |---|---|---|---|
-| K1 | No Python test runner (`pytest` absent) | Blocks all mandated tests | Sprint 1 |
-| K2 | No JS test runner (`vitest` absent) | Blocks frontend tests | Sprint 1 (install) / Sprint 7 (use) |
-| K3 | `package.json` `"lint"` script calls ESLint, which is **not installed** — the script fails | Blocks CI linting | Sprint 1: install ESLint or remove the script |
-| K4 | No `aliases` field on curated records | Weakens alias matching | Sprint 1: additive field, seeded from titles |
-| K5 | No structured external-identifier field (arXiv/DOI/OEIS) | Weakens deterministic matching | Sprint 1: additive `externalIds` object |
+| K1 | ~~No Python test runner~~ | — | ✅ Closed in Sprint 1 (pytest, 49 tests) |
+| K2 | No JS test runner (`vitest` absent) | Blocks frontend tests only | Sprint 7, when there is frontend behaviour to test |
+| K3 | ~~Broken `lint` script~~ | — | ✅ Closed in Sprint 1 (removed) |
+| K4 | No `aliases` field on curated records | Weakens alias matching | Sprint 3 — needed by the matcher, not by ingestion |
+| K5 | No structured external-identifier field on curated records | Weakens deterministic matching | Sprint 3 — observations already extract them; curated side needed for matching |
 | K6 | Only **13 of 40** records carry a source URL | Weakens corroboration matching | Backfill is a human task; not automation's job |
 | K7 | `resultType` and `resolution` are near-duplicate fields | Cosmetic | Out of scope; automation writes neither |
 
@@ -80,9 +107,10 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 ## Tests
 
-**Currently passing:** none — no test suite exists yet (K1, K2).
+**Currently passing:** 49 / 49 (`python -m pytest`) — no network, no API keys required.
 **Currently failing:** none.
 **Build health:** `python scripts/build_data.py` ✅ · `pnpm build` ✅ · live deploy ✅
+**`data/results.json`:** byte-identical — asserted by `test_curated_results_are_never_touched`.
 
 ---
 
@@ -90,8 +118,9 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 | # | Action | Needed by |
 |---|---|---|
-| U1 | Add repository secret **`TWITTERAPI_IO_KEY`** | Sprint 5 (first real run) |
-| U2 | Add repository secret **`GEMINI_API_KEY`** | Sprint 5 (first real run) |
+| U1 | ~~Add repository secret `TWITTERAPI_IO_KEY`~~ | ✅ Done 2026-07-25 |
+| U2 | ~~Add repository secret `GEMINI_API_KEY`~~ | ✅ Done 2026-07-25 |
+| U5 | **Run the smoke test**: Actions → "Smoke test — TwitterAPI.io connectivity" → Run workflow. Confirms the key works and the response shape matches the client. | Now |
 | U3 | Confirm Actions has **write** permission for the collector (Settings → Actions → General → Workflow permissions → Read and write) | Sprint 5 |
 | U4 | Answer the open questions in §6 | Sprint 1 |
 
@@ -112,14 +141,18 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 ## Next recommended task
 
-**Sprint 1.** Concretely, in order:
+**Sprint 2 — Gemini structured extraction.** In order:
 
-1. Add `pytest` + `httpx` + `rapidfuzz` to `scripts/requirements.txt`; fix or remove the
-   broken `lint` script.
-2. Create `config/twitter_queries.json` from the brief's query list.
-3. Implement `models.py`, `urls.py`, `identifiers.py`, `ids.py`, `store.py`.
-4. Implement `twitter.py` behind an interface, with recorded fixtures.
-5. Implement `ingest.py` with `--dry-run`.
-6. Tests: dedup, URL canonicalisation, identifier extraction, stable ids, idempotent rerun,
-   corrupted JSON, empty API response.
-7. Verify `results.json` is byte-identical and `pnpm build` still passes.
+1. `scripts/automation/gemini.py` — client for `gemini-3.6-flash`, timeout + retry,
+   key from env only, never logged.
+2. `ExtractionResult` in `models.py` — every field nullable so the model is never forced
+   to invent an identifier.
+3. `prompts/extraction_v1.md` — versioned; **engagement metrics must not appear in it**.
+4. Extraction cache keyed on `(observationId, promptVersion, modelVersion)`; a second run
+   makes zero API calls.
+5. Failure handling: mark `extraction_failed`, keep the observation, allow reprocessing.
+6. Tests with mocked responses: success, malformed JSON, schema violation, timeout,
+   rate-limit, cache hit.
+
+**Before starting**, run the smoke test (U5) so we know the live response shape matches
+the fixtures this sprint was built against.

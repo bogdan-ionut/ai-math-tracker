@@ -8,7 +8,7 @@ proposed sequence are flagged **[amended]** with a reason.
 | Sprint | Title | Status |
 |---|---|---|
 | 0 | Repository assessment and architecture | **completed** |
-| 1 | Test scaffolding + deterministic ingestion | planned |
+| 1 | Test scaffolding + deterministic ingestion | **completed** |
 | 2 | Gemini structured extraction | planned |
 | 3 | Entity matching and shortlist | planned |
 | 4 | Safe merge engine and review queue | planned |
@@ -46,7 +46,7 @@ weaknesses, not generic ones. ✅ Migration question answered explicitly.
 
 ---
 
-## Sprint 1 — Test scaffolding + deterministic ingestion · `planned`
+## Sprint 1 — Test scaffolding + deterministic ingestion · `completed`
 
 **Objective.** Get raw Twitter data into a normalised, deduplicated, stably-identified
 observation store — with zero model calls — and make the repository testable.
