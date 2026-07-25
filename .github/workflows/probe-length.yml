@@ -1,0 +1,23 @@
+name: Probe — query length limit
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements.txt
+      - env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+        run: python -m scripts.automation.probe_length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: length-probe
+          path: length_probe.json
+          retention-days: 7
