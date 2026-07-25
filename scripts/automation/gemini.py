@@ -86,6 +86,11 @@ class GeminiClient:
                     resp = client.post(url, json=payload, headers=headers)
                 if resp.status_code == 200:
                     return resp.json()
+                if resp.status_code in (402, 403):
+                    raise GeminiError(
+                        f"HTTP {resp.status_code} — Gemini quota or permission problem; "
+                        "retrying will not help"
+                    )
                 if resp.status_code in (429, 500, 502, 503, 504):
                     last = GeminiError(f"HTTP {resp.status_code} from generateContent")
                     if attempt < self._max_retries:

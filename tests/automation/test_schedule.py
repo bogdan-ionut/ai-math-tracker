@@ -177,3 +177,49 @@ class TestWorkflowInventory:
             assert perms.get("contents", "read") == "read", (
                 f"{path.name} should not have write access"
             )
+
+
+class TestTerminalFailures:
+    """402 means out of credit. Retrying cannot help, and retrying it for every
+    remaining query turns one problem into fourteen."""
+
+    def test_twitter_402_is_not_retried(self, monkeypatch):
+        import httpx
+        from scripts.automation.twitter import TwitterApiClient, TwitterApiError
+
+        calls = {"n": 0}
+
+        class Resp:
+            status_code = 402
+            headers: dict = {}
+
+        def fake(self, url, params, headers):
+            calls["n"] += 1
+            return Resp()
+
+        monkeypatch.setattr(httpx.Client, "get", fake)
+        c = TwitterApiClient(api_key="k", max_retries=3, backoff=0, min_interval=0)
+        with pytest.raises(TwitterApiError) as e:
+            c.search("anything")
+        assert calls["n"] == 1, "402 must not be retried"
+        assert "out of credit" in str(e.value)
+
+    def test_gemini_402_is_not_retried(self, monkeypatch):
+        import httpx
+        from scripts.automation.gemini import GeminiClient, GeminiError
+
+        calls = {"n": 0}
+
+        class Resp:
+            status_code = 402
+            headers: dict = {}
+
+        def fake(self, url, json, headers):  # noqa: A002
+            calls["n"] += 1
+            return Resp()
+
+        monkeypatch.setattr(httpx.Client, "post", fake)
+        c = GeminiClient(api_key="k", max_retries=3, backoff=0, min_interval=0)
+        with pytest.raises(GeminiError):
+            c.generate_json("p", {})
+        assert calls["n"] == 1

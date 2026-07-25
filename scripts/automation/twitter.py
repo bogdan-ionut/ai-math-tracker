@@ -88,6 +88,13 @@ class TwitterApiClient:
                     resp = client.get(url, params=params, headers=self._headers())
                 if resp.status_code == 200:
                     return resp.json()
+                if resp.status_code == 402:
+                    # Out of credit. Retrying cannot help and burns the retry
+                    # budget on every remaining query in the run.
+                    raise TwitterApiError(
+                        "HTTP 402 — TwitterAPI.io account is out of credit; "
+                        "top up at twitterapi.io before the next run"
+                    )
                 if resp.status_code in (429, 500, 502, 503, 504):
                     # transient — back off and retry
                     last = TwitterApiError(f"HTTP {resp.status_code} from search endpoint")

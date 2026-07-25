@@ -278,6 +278,8 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 | K6 | Only **13 of 40** records carry a source URL | Weakens corroboration matching | Backfill is a human task; not automation's job |
 | K8 | `teorth` and `erdosproblems` handles return no results | Loses two high-value trusted accounts | Confirm the correct handles by hand, then enable |
 | K9 | Gold set is fitted to wordings we already know | 100% recall is a floor, not proof | Add positives whenever a real miss is observed |
+| **K10** | **Six high-precision queries returned zero on the first live run** | Those families are unproven in production | Re-run `probe-length.yml` once API credit is restored. Length is *not* the cause (462 chars worked, 417 did not); restrictiveness is the likely answer. See TWITTER_QUERY_STRATEGY §5b |
+| **K11** | **TwitterAPI.io account is out of credit (HTTP 402)** | Ingestion cannot run | Top up at twitterapi.io. 402 is now treated as terminal rather than retried |
 | K7 | `resultType` and `resolution` are near-duplicate fields | Cosmetic | Out of scope; automation writes neither |
 
 ---
@@ -301,6 +303,7 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 | U3 | Confirm Actions has **write** permission (Settings → Actions → General → Workflow permissions → **Read and write**) — the collector needs it to commit data | **Now, before the first live run** |
 | U4 | Answer the open questions in §6 | when convenient |
 | U6 | Watch 2–3 scheduled dry runs, read `query_telemetry.json` and the review reasons, then set `schedule.dryRunOnSchedule: false` | after a few days |
+| **U7** | **Top up the TwitterAPI.io account** — the first live run exhausted it (HTTP 402) | **before the next run** |
 
 > Secrets are **not** required for Sprints 1–4: all tests and the dry-run path use fixtures.
 

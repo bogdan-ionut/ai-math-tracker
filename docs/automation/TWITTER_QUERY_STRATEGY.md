@@ -25,7 +25,7 @@ API (`.github/workflows/probe-twitter-syntax.yml`, run **30155078770**).
 | `url:arxiv.org` | ✅ supported | 20 results |
 | `since:YYYY-MM-DD` | ✅ supported | 20 results |
 | Unicode (`Erdős`) | ✅ supported | 20 results — no ASCII folding needed |
-| 788-character query | accepted | no error; length is not a near-term constraint |
+| 788-character query | accepted, **0 results** | see §5b — I originally read this as "fine"; it was a warning |
 
 Pagination returns **20 tweets per page**; `queryType` is `Latest` or `Top`.
 
@@ -173,6 +173,35 @@ classifier**. Excluding them by keyword would cost real signal — `-counterexam
 (Sprint 2) is the right place to reject them.
 
 ---
+
+## 5b. First live run — six queries returned nothing (unresolved)
+
+The first live dry run (`30156362824`) collected **37 tweets from 14 queries**, but six
+returned **exactly zero**:
+
+| Returned 20 | Returned 0 |
+|---|---|
+| `broad-recall`, `problem-registries`, `arxiv-linked`, `account-*` | `explicit-ai-solution`, `academic-announcement`, `formal-verification`, `disputes-and-corrections`, `artifact-release`, `named-systems` |
+
+**My first hypothesis was query length, and it is not supported.** A bisecting probe
+(`probe-length.yml`) found a 462-character query returning results while a 417-character one
+returned none — inconsistent with a length cutoff. The Sprint 1.5 probe had reported a
+788-char query as `ACCEPTED returned=0`; I recorded "length is not a constraint" because
+there was no error, when the zero was the part worth investigating.
+
+**The likeliest remaining explanation is that these queries are simply restrictive.**
+Each demands a rare conjunction inside a ~30-hour window — a tweet containing *"verified in
+Lean"* **and** an AI system name, or *"we prove"* **and** a mathematical object **and** an AI
+term. Zero on a quiet day may well be the correct answer, not a bug.
+
+**This is unresolved.** The probe that would settle it hit `HTTP 402` — the TwitterAPI.io
+account ran out of credit mid-run. Once credit is restored, re-run **Probe — query length
+limit**; if long queries return results there, restrictiveness is confirmed and no change is
+needed. If they do not, the builder must split families into narrower queries.
+
+Until then the high-precision families are **not proven to work in production**, and the
+corroborated observations we do get come from `problem-registries`, `arxiv-linked` and the
+account queries.
 
 ## 6. Telemetry
 
