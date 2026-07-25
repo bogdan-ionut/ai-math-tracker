@@ -159,11 +159,20 @@ def cross_check_identifiers(
         if kind not in truth:
             warnings.append(f"model reported unknown identifier kind {kind!r}")
             continue
-        real = set(truth.get(kind) or [])
+        real = list(truth.get(kind) or [])
         for v in values or []:
             norm = str(v).strip().lower().removeprefix("arxiv:").removeprefix("#")
-            if any(norm == r.lower() or norm in r.lower() or r.lower() in norm for r in real):
-                kept.setdefault(kind, []).append(str(v).strip())
+            # Find OUR canonical form of whatever the model referred to. The model
+            # may hand back a full URL where our regex produced a slug; keeping
+            # both would make one identifier look like two and silently weaken
+            # deterministic matching. Our form always wins.
+            canonical = next(
+                (r for r in real
+                 if norm == r.lower() or norm in r.lower() or r.lower() in norm),
+                None,
+            )
+            if canonical is not None:
+                kept.setdefault(kind, []).append(canonical)
             else:
                 warnings.append(f"discarded unverifiable {kind} identifier {v!r}")
 

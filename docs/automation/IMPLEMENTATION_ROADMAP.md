@@ -10,7 +10,7 @@ proposed sequence are flagged **[amended]** with a reason.
 | 0 | Repository assessment and architecture | **completed** |
 | 1 | Test scaffolding + deterministic ingestion | **completed** |
 | 1.5 | Query strategy, syntax probe and calibration **[amended]** | **completed** |
-| 2 | Gemini structured extraction | planned |
+| 2 | Gemini structured extraction | **completed** |
 | 3 | Entity matching and shortlist | planned |
 | 4 | Safe merge engine and review queue | planned |
 | 5 | Scheduled GitHub Actions workflow | planned |
@@ -125,7 +125,7 @@ verification (test-enforced). ✅ Dispute language searched. ✅ Recall and nois
 
 ---
 
-## Sprint 2 — Gemini structured extraction · `planned`
+## Sprint 2 — Gemini structured extraction · `completed`
 
 **Objective.** Turn observation text into validated structured data, cached and versioned.
 

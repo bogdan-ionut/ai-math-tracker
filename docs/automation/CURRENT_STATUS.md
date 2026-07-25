@@ -6,8 +6,8 @@
 > meaningless daily diffs. See assessment §2.7.
 
 **Last updated:** 2026-07-25
-**Current sprint:** Sprint 1.5 — Query strategy, syntax probe and calibration · **completed**
-**Next recommended task:** Sprint 2 — Gemini structured extraction (`gemini-3.6-flash`)
+**Current sprint:** Sprint 2 — Gemini structured extraction · **completed**
+**Next recommended task:** Sprint 3 — entity matching and shortlist
 **Awaiting:** Q2/Q3 in §6; optional manual confirmation of the `teorth` / `erdosproblems` handles
 
 ---
@@ -90,11 +90,46 @@ nothing (its AI group omitted system names); account queries appeared to match e
 (the offline matcher ignored `from:`); and five system names present in `results.json`
 (Fable, MathDyad, Rethlas, Archon, Harmonic) were missing from the taxonomy.
 
+### Sprint 2 — Gemini structured extraction ✅
+
+- **Client** (`gemini.py`) behind a `StructuredModel` protocol, paced and retried like the
+  Twitter client, key from env only, never logged or in an exception.
+- **Schema** (`extraction_schema.py`): 21 fields, **all optional**, only four required
+  (`isRelevant`, `claimType`, `resultType`, `extractionConfidence`). Nothing fabricable is
+  required — a forced field invites invention.
+- **Prompt** `extraction_v1`, versioned into the cache key. Distinguishes *claim* from
+  *evidence* from *dispute*, and forbids inventing identifiers.
+- **Hallucination guard** — identifiers the model reports are cross-checked against our own
+  regexes over the source text; unverifiable ones are discarded with a warning, and our
+  canonical form always wins over the model's.
+- **Cache** keyed on `(text hash, promptVersion, model)` — second run costs zero calls.
+- **Failure is never emptiness** — malformed JSON, schema violation, timeout and 5xx all
+  mark `extraction_failed` and keep the observation for reprocessing.
+- 47 tests; 120 total.
+
+**Live smoke test passed** (run `30155637877`, `gemini-3.6-flash`, 3 API calls):
+
+| Case | Result |
+|---|---|
+| Real Graffiti 154 post | ✅ relevant · `new_result` / `counterexample` · problem, model (Devin) and org (Cognition) all correct · confidence 0.95 |
+| Proof-of-work crypto post | ✅ rejected as `unrelated`, confidence 1.0 |
+| Unsourced "AI settled Erdős unit distance" | ✅ read as a claim, **no identifier invented** |
+
+Two bugs the work surfaced:
+
+1. `load_prompt` was shipping the file's documentation header to the model — and that
+   header lists the engagement vocabulary the prompt exists to avoid. Now only the
+   SYSTEM/USER sections go over the wire. Caught by a test, not by review.
+2. The live output kept both `cognition/graffiti-lean` and
+   `https://github.com/cognition/graffiti-lean` as separate identifiers, because the model
+   returned a URL where our regex produced a slug. One identifier looking like two would
+   silently weaken deterministic matching. The guard now folds onto our canonical form.
+
 ---
 
 ## Remaining work
 
-Sprints 2–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
+Sprints 3–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 
 ---
 
@@ -122,6 +157,9 @@ Sprints 2–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 | D18 | A **dispute/correction** family is Tier 1 | Both `disputed` records here are that signal; Sprint 1 searched only success claims and could not have found either |
 | D19 | Trusted accounts require **probe verification** to be enabled | Sprint 1 shipped six handles from memory; three of them return nothing. Test-enforced |
 | D20 | Known false positives are **accepted**, not excluded by keyword | Recall in search, precision in the classifier. `-counterexample` would gut two of the best families |
+| D21 | Only 4 of 21 extraction fields are **required** | A required field the post does not support is an invitation to invent one |
+| D22 | Model-reported identifiers are **cross-checked** against our regexes, and our canonical form wins | An invented arXiv id would be treated as a hard deterministic match and merge unrelated problems |
+| D23 | Prompt files are documentation **and** prompt; only the `## SYSTEM` section onward is sent | The header discusses engagement metrics, which the prompt must never mention |
 
 ---
 
@@ -158,7 +196,7 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 ## Tests
 
-**Currently passing:** 73 / 73 (`python -m pytest`) — no network, no API keys required.
+**Currently passing:** 120 / 120 (`python -m pytest`) — no network, no API keys required.
 **Currently failing:** none.
 **Build health:** `python scripts/build_data.py` ✅ · `pnpm build` ✅ · live deploy ✅
 **`data/results.json`:** byte-identical — asserted by `test_curated_results_are_never_touched`.
@@ -192,20 +230,16 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 ## Next recommended task
 
-**Sprint 2 — Gemini structured extraction.** The classifier is now the load-bearing
-component: search deliberately admits ~30% noise (see TWITTER_QUERY_STRATEGY §5) and
-Gemini is what rejects it. In order:
+**Sprint 3 — entity matching and shortlist.** Extraction now yields a canonical problem
+name, aliases and verified identifiers; matching decides *which existing problem* an
+observation is about. In order:
 
-1. `scripts/automation/gemini.py` — client for `gemini-3.6-flash`, timeout + retry,
-   key from env only, never logged.
-2. `ExtractionResult` in `models.py` — every field nullable so the model is never forced
-   to invent an identifier.
-3. `prompts/extraction_v1.md` — versioned; **engagement metrics must not appear in it**.
-4. Extraction cache keyed on `(observationId, promptVersion, modelVersion)`; a second run
-   makes zero API calls.
-5. Failure handling: mark `extraction_failed`, keep the observation, allow reprocessing.
-6. Tests with mocked responses: success, malformed JSON, schema violation, timeout,
-   rate-limit, cache hit.
-
-The smoke test has confirmed the live response shape matches the fixtures this sprint was
-built against, so Sprint 2 can proceed on the existing fixtures.
+1. Seed `data/automation/aliases.json` from `title` + `erdosNumber` in `results.json`,
+   and add the additive `aliases` / `externalIds` fields to curated records (K4, K5).
+2. Deterministic identifier matching first — arXiv, DOI, OEIS, Erdős, Lean repo, canonical
+   URL. A deterministic hit must **skip the judge entirely**.
+3. Alias lookup, then normalised-title similarity (RapidFuzz). No embeddings (D3).
+4. Shortlist capped at 5; `prompts/judge_v1.md` with the seven decision values.
+5. Judge invoked **only** on ambiguous shortlists; failure routes to review, never guesses.
+6. Tests: exact identifier resolves with zero model calls; conflicting identifiers never
+   merge; judge called exactly once on ambiguity.

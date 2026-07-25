@@ -136,6 +136,22 @@ class TestIdentifierCrossCheck:
         kept, _ = cross_check_identifiers(r, "see arXiv:2604.03789", [])
         assert kept["arxiv"] == ["2604.03789"]
 
+    def test_model_url_is_folded_onto_our_canonical_form(self):
+        """The model may return a URL where our regex produced a slug. Keeping
+        both would make one identifier look like two."""
+        r = ExtractionResult(**{**GOOD, "externalIdentifiers": {
+            "github": ["https://github.com/cognition/graffiti-lean"]}})
+        kept, _ = cross_check_identifiers(
+            r, "proof in Lean", ["https://github.com/cognition/graffiti-lean"]
+        )
+        assert kept["github"] == ["cognition/graffiti-lean"]
+        assert not any(v.startswith("http") for v in kept["github"])
+
+    def test_arxiv_prefix_folded(self):
+        r = ExtractionResult(**{**GOOD, "externalIdentifiers": {"arxiv": ["arXiv:2604.03789"]}})
+        kept, _ = cross_check_identifiers(r, "see arXiv:2604.03789", [])
+        assert kept["arxiv"] == ["2604.03789"]
+
     def test_unknown_identifier_kind_is_flagged(self):
         r = ExtractionResult(**{**GOOD, "externalIdentifiers": {"mathscinet": ["MR123"]}})
         _, warns = cross_check_identifiers(r, "text", [])
