@@ -1,0 +1,188 @@
+name: Daily discovery
+
+# Collects, extracts, matches and merges. Commits ONLY data/automation/**, and
+# only when something substantive changed. Pushing that commit is what triggers
+# deploy-pages.yml — the causation graph is acyclic, because deploy has no
+# commit step of its own, so no [skip ci] guard is needed.
+
+on:
+  schedule:
+    # 04:20 UTC = 07:20 Europe/Bucharest (EEST) / 06:20 (EET). Actions cron is
+    # UTC-only; the DST drift is documented in OPERATIONS.md.
+    - cron: "20 4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report proposed mutations without writing or committing"
+        type: boolean
+        default: true
+      force_dry_run_off:
+        description: "Override config dryRunOnSchedule and actually write"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write        # the collector commits data; deploy stays read-only
+
+concurrency:
+  group: discover
+  cancel-in-progress: false   # never kill a half-written data run
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Check automation is enabled
+        id: gate
+        run: |
+          ENABLED=$(python -c "import json;print(json.load(open('config/automation.json'))['schedule']['enabled'])")
+          if [ "$ENABLED" != "True" ]; then
+            echo "::notice::automation disabled in config/automation.json — stopping"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate secrets
+        if: steps.gate.outputs.run == 'true'
+        env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          missing=""
+          [ -z "${TWITTERAPI_IO_KEY}" ] && missing="$missing TWITTERAPI_IO_KEY"
+          [ -z "${GEMINI_API_KEY}" ] && missing="$missing GEMINI_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::missing repository secret(s):$missing"
+            exit 1
+          fi
+          echo "secrets present (lengths ${#TWITTERAPI_IO_KEY}, ${#GEMINI_API_KEY})"
+
+      - name: Decide dry-run mode
+        if: steps.gate.outputs.run == 'true'
+        id: mode
+        env:
+          INPUT_DRY: ${{ inputs.dry_run }}
+          INPUT_FORCE_OFF: ${{ inputs.force_dry_run_off }}
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          cfg = json.load(open("config/automation.json"))["schedule"]
+          event = os.environ.get("GITHUB_EVENT_NAME", "")
+          if event == "workflow_dispatch":
+              dry = os.environ.get("INPUT_DRY", "true").lower() == "true"
+              if os.environ.get("INPUT_FORCE_OFF", "false").lower() == "true":
+                  dry = False
+          else:
+              dry = bool(cfg.get("dryRunOnSchedule", True))
+          print(f"dry={'true' if dry else 'false'}")
+          PY
+          echo "resolved dry-run mode: $(grep dry= "$GITHUB_OUTPUT" | tail -1)"
+
+      - name: Ingest from X
+        if: steps.gate.outputs.run == 'true'
+        env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+        run: |
+          if [ "${{ steps.mode.outputs.dry }}" = "true" ]; then
+            python -m scripts.automation.ingest --dry-run | tee ingest.json
+          else
+            python -m scripts.automation.ingest | tee ingest.json
+          fi
+
+      - name: Extract
+        if: steps.gate.outputs.run == 'true' && steps.mode.outputs.dry == 'false'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -m scripts.automation.extraction | tee extract.json
+
+      - name: Match, judge and merge
+        if: steps.gate.outputs.run == 'true' && steps.mode.outputs.dry == 'false'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python -m scripts.automation.pipeline | tee pipeline.json
+
+      - name: Validate generated data
+        if: steps.gate.outputs.run == 'true' && steps.mode.outputs.dry == 'false'
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          bad = []
+          for p in pathlib.Path("data/automation").glob("*.json"):
+              try:
+                  json.loads(p.read_text())
+              except Exception as exc:
+                  bad.append(f"{p}: {exc}")
+          if bad:
+              print("::error::invalid JSON produced: " + "; ".join(bad)); sys.exit(1)
+          print("all generated JSON parses")
+          PY
+          python scripts/build_data.py
+
+      - name: Assess whether anything meaningful changed
+        if: steps.gate.outputs.run == 'true' && steps.mode.outputs.dry == 'false'
+        id: changes
+        run: |
+          if python -m scripts.automation.changes; then
+            echo "commit=true" >> "$GITHUB_OUTPUT"
+          else
+            rc=$?
+            if [ "$rc" = "2" ]; then exit 1; fi
+            echo "commit=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit data
+        if: steps.changes.outputs.commit == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/automation
+          git commit -m "data: daily discovery $(date -u +%Y-%m-%d)
+
+          Automated collection. Curated results.json is untouched by design;
+          candidates are proposals and are never promoted automatically."
+          git push
+
+      - name: Restore working tree when not committing
+        if: always() && steps.changes.outputs.commit != 'true'
+        run: git checkout -- data/automation 2>/dev/null || true
+
+      - name: Upload run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: discovery-run-${{ github.run_id }}
+          path: |
+            ingest.json
+            extract.json
+            pipeline.json
+            data/automation/query_telemetry.json
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Daily discovery"
+            echo ""
+            echo "- mode: \`${{ steps.mode.outputs.dry == 'true' && 'dry-run' || 'live' }}\`"
+            echo "- committed: \`${{ steps.changes.outputs.commit || 'no' }}\`"
+            echo ""
+            for f in ingest.json extract.json pipeline.json; do
+              if [ -f "$f" ]; then
+                echo "<details><summary>$f</summary>"
+                echo ""; echo '```json'; cat "$f"; echo '```'; echo "</details>"; echo ""
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

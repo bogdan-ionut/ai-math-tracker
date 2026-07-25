@@ -45,5 +45,12 @@
       "auditNotes",
       "provenanceNote"
     ]
+  },
+  "schedule": {
+    "$comment": "Controls the daily run. dryRunOnSchedule starts TRUE deliberately: the first days should observe and report without committing, so the telemetry and review queue can be read before anything is written. Flip to false when the numbers look right — it is a config change, not a code change.",
+    "enabled": true,
+    "dryRunOnSchedule": true,
+    "cronUtc": "20 4 * * *",
+    "$cronComment": "GitHub Actions cron is UTC-only — there is no timezone field. 04:20 UTC is 07:20 in Bucharest during EEST (summer) and 06:20 during EET (winter); the one-hour drift across DST is documented rather than solved. Off-the-hour because GitHub delays on-the-hour schedules under load."
   }
 }

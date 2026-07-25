@@ -6,8 +6,8 @@
 > meaningless daily diffs. See assessment §2.7.
 
 **Last updated:** 2026-07-25
-**Current sprint:** Sprint 4 — Safe merge engine and review queue · **completed**
-**Next recommended task:** Sprint 5 — scheduled GitHub Actions workflow
+**Current sprint:** Sprint 5 — Scheduled GitHub Actions workflow · **completed**
+**Next recommended task:** watch a few dry runs, then flip `dryRunOnSchedule` — then Sprint 6
 **Awaiting:** Q2/Q3 in §6; optional manual confirmation of the `teorth` / `erdosproblems` handles
 
 ---
@@ -182,11 +182,33 @@ Two design points the tests forced:
    gate.** Both end in review — the safety property holds either way — but the test now
    pins both routes so a future refactor cannot quietly collapse them.
 
+### Sprint 5 — Scheduled GitHub Actions workflow ✅
+
+- **`discover.yml`** — daily at `20 4 * * *` UTC (07:20 EEST / 06:20 EET; Actions cron is
+  UTC-only, so the DST drift is documented not solved) plus `workflow_dispatch`.
+- **Acyclic topology.** `discover` has `contents: write` and commits
+  `data/automation/**`; `deploy-pages` has `contents: read` and no commit step at all, so
+  it cannot re-trigger the collector. No `[skip ci]` guard needed, and a test asserts it.
+- **`changes.py`** decides what is worth committing. `processing_state.json` and the
+  telemetry file move on *every* run, so a naive diff would produce 365 empty commits a
+  year; volatile keys are stripped before comparing, and timestamps ride along only when
+  something substantive changed.
+- **Secret validation** fails fast and prints lengths, never values.
+- **Kill switches in config, not code**: `schedule.enabled`, `schedule.dryRunOnSchedule`,
+  per-family `enabled`, per-account `enabled`.
+- **`OPERATIONS.md`** — running, inspecting the queue, recovery, disabling, rotation, cost.
+- 26 tests; **230 total**.
+
+**The scheduled run starts in dry-run.** `dryRunOnSchedule: true` is deliberate: the search
+layer admits noise by design and the measured corroboration rate on X was 3 in 20, so the
+first days should observe and report before anything is written. Flipping it is a config
+change.
+
 ---
 
 ## Remaining work
 
-Sprints 5–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
+Sprints 6–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 
 ---
 
@@ -223,6 +245,9 @@ Sprints 5–8 in `IMPLEMENTATION_ROADMAP.md`, all `planned`.
 | D27 | The judge client is built **lazily** | A deterministic-only run must not require an API key for a call it will never make |
 | D28 | A **resolved** review entry is never reopened | A human already answered; re-asking daily turns the queue into noise |
 | D29 | An unrecognised decision goes to **review**, not to a default | An unknown label is a question, not a licence to act |
+| D30 | The scheduled run starts in **dry-run** | Observe the telemetry and queue for a few days before writing; flipping it is config, not code |
+| D31 | Commits require a **substantive** change; volatile keys are stripped first | `lastRunAt` moves every run — committing on it would bury the meaningful commits under 365 empty ones |
+| D32 | Every kill switch lives in **config** | Turning something off during an incident must not require a code change and a review |
 
 ---
 
@@ -259,7 +284,7 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 
 ## Tests
 
-**Currently passing:** 204 / 204 (`python -m pytest`) — no network, no API keys required.
+**Currently passing:** 230 / 230 (`python -m pytest`) — no network, no API keys required.
 **Currently failing:** none.
 **Build health:** `python scripts/build_data.py` ✅ · `pnpm build` ✅ · live deploy ✅
 **`data/results.json`:** byte-identical — asserted by `test_curated_results_are_never_touched`.
@@ -273,8 +298,9 @@ All deviations are argued in `ARCHITECTURE_ASSESSMENT.md` §7.
 | U1 | ~~Add repository secret `TWITTERAPI_IO_KEY`~~ | ✅ Done 2026-07-25 |
 | U2 | ~~Add repository secret `GEMINI_API_KEY`~~ | ✅ Done 2026-07-25 |
 | U5 | ~~Run the TwitterAPI.io smoke test~~ | ✅ Passed 2026-07-25 (run 30154800586) |
-| U3 | Confirm Actions has **write** permission for the collector (Settings → Actions → General → Workflow permissions → Read and write) | Sprint 5 |
-| U4 | Answer the open questions in §6 | Sprint 1 |
+| U3 | Confirm Actions has **write** permission (Settings → Actions → General → Workflow permissions → **Read and write**) — the collector needs it to commit data | **Now, before the first live run** |
+| U4 | Answer the open questions in §6 | when convenient |
+| U6 | Watch 2–3 scheduled dry runs, read `query_telemetry.json` and the review reasons, then set `schedule.dryRunOnSchedule: false` | after a few days |
 
 > Secrets are **not** required for Sprints 1–4: all tests and the dry-run path use fixtures.
 

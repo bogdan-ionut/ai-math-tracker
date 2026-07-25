@@ -13,7 +13,7 @@ proposed sequence are flagged **[amended]** with a reason.
 | 2 | Gemini structured extraction | **completed** |
 | 3 | Entity matching and shortlist | **completed** |
 | 4 | Safe merge engine and review queue | **completed** |
-| 5 | Scheduled GitHub Actions workflow | planned |
+| 5 | Scheduled GitHub Actions workflow | **completed** |
 | 6 | Additional high-precision sources **[amended]** | planned |
 | 7 | Frontend candidate visibility (optional) | planned |
 | 8 | Hardening and operational documentation | planned |
@@ -201,7 +201,7 @@ additive; deleting them restores the prior state.
 
 ---
 
-## Sprint 5 — Scheduled GitHub Actions workflow · `planned`
+## Sprint 5 — Scheduled GitHub Actions workflow · `completed`
 
 **Objective.** Run daily, safely, without loops or noise commits.
 
