@@ -1,7 +1,8 @@
 # Implementation roadmap — automated discovery pipeline
 
-Sprint sequence refined from the brief after the repository assessment. Changes from the
-proposed sequence are flagged **[amended]** with a reason.
+Revised 2026-07-25 after an external review (all 15 claims verified — see
+[REVIEW_RESPONSE.md](REVIEW_RESPONSE.md)) and a five-lens adversarial audit that found four
+further defects in the judge stage.
 
 **Statuses:** `planned` · `in progress` · `blocked` · `completed`
 
@@ -9,289 +10,276 @@ proposed sequence are flagged **[amended]** with a reason.
 |---|---|---|
 | 0 | Repository assessment and architecture | **completed** |
 | 1 | Test scaffolding + deterministic ingestion | **completed** |
-| 1.5 | Query strategy, syntax probe and calibration **[amended]** | **completed** |
+| 1.5 | Query strategy, syntax probe and calibration | **completed** |
 | 2 | Gemini structured extraction | **completed** |
 | 3 | Entity matching and shortlist | **completed** |
 | 4 | Safe merge engine and review queue | **completed** |
 | 5 | Scheduled GitHub Actions workflow | **completed** |
-| 6 | Additional high-precision sources **[amended]** | planned |
+| **5.1** | **Truthfulness and CI** | **planned — next** |
+| **5.2** | **Make the judge actually decide** | planned |
+| **5.3** | **Retrieval correctness** | planned |
+| **5.4** | **Data contracts, cost and identity** | planned |
+| **5.5** | **Real no-write end-to-end → gate to live writes** | planned |
+| 6 | Multi-source + candidate entity resolution | planned |
+| 6.5 | Curator workflow | planned |
 | 7 | Frontend candidate visibility (optional) | planned |
 | 8 | Hardening and operational documentation | planned |
 
-> **[amended]** The brief's Sprint 6 was "frontend candidate visibility". A sprint for
-> **additional sources** (arXiv, erdosproblems.com, Tao's AI-contributions wiki) has been
-> inserted ahead of it, per §2.1 of the assessment: those sources are higher-precision
-> than X and materially improve the corroboration gate that Twitter promotion depends on.
-> Frontend visibility moves to Sprint 7 and remains optional.
+> **Sprints 0–5 are unchanged and remain as delivered.** Their detail has been moved to
+> [ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md) so this file stays about what is next.
 
 ---
 
-## Sprint 0 — Repository assessment and architecture · `completed`
+## Why the order changed
 
-**Objective.** Understand the repository, critically evaluate the proposal, and record
-the plan before any production change.
+The review proposed *correctness → CI → multi-source*. Three adjustments:
 
-**Files changed.** `docs/automation/ARCHITECTURE_ASSESSMENT.md`,
-`docs/automation/IMPLEMENTATION_ROADMAP.md`, `docs/automation/CURRENT_STATUS.md`.
-
-**Deliverables.** All three documents, containing a critical evaluation, an explicit
-answer on the schema-migration question, and a documented data-layer contract.
-
-**Validation.** `pnpm build` and `python scripts/build_data.py` still succeed; live site
-unchanged; `git diff` touches only `docs/`.
-
-**Acceptance criteria.** ✅ No production behaviour changed. ✅ Assessment names concrete
-weaknesses, not generic ones. ✅ Migration question answered explicitly.
-
-**Dependencies.** None. **Risks.** None. **Rollback.** Delete `docs/automation/`.
+1. **CI first.** Five correctness sprints are about to land. Tests that do not gate a merge
+   are documentation, not protection, and this is the cheapest item on the list.
+2. **A new judge sprint (5.2).** The audit found the judge's `matchedProblemId` is never
+   read, `requiresHumanReview` is discarded, and judge *unavailability* is recorded as the
+   judge's *conclusion*. Improving retrieval first would only feed more data into a stage
+   that throws away its own answer.
+3. **Retrieval before the end-to-end gate.** The review puts the real no-write run first.
+   It is the right gate, but running it while retrieval silently drops matches measures the
+   wrong pipeline. Fix the instrument, then take the measurement.
 
 ---
 
-## Sprint 1 — Test scaffolding + deterministic ingestion · `completed`
+## Sprint 5.1 — Truthfulness and CI · `planned`
 
-**Objective.** Get raw Twitter data into a normalised, deduplicated, stably-identified
-observation store — with zero model calls — and make the repository testable.
+**Objective.** Stop the repository asserting things that are not true, and make the 232
+tests actually protect the branch.
 
-> **[amended]** Test tooling is pulled forward from the brief's later sprints. The brief
-> mandates a large test suite; none of it can run today (assessment §1.6).
+**Why first.** Every later sprint is a correctness change; they should land behind a gate.
 
-**Files expected to change**
+**Files.** `.github/workflows/ci.yml` (new) · `README.md` · `scripts/automation/changes.py`
+· `.github/workflows/discover.yml`
+
+**Deliverables**
+
+1. `ci.yml` on `push` and `pull_request`: `pytest`, `build_data.py`,
+   `pnpm install --frozen-lockfile`, `pnpm build`, `calibrate` (recall must not regress).
+2. README: remove "there is deliberately no automated scraper" — there is one. Describe the
+   curated-vs-automated split honestly.
+3. `changes.py`: make the `unexpected` check real — run `git status --porcelain` unscoped,
+   then flag anything outside `data/automation/`. Today it is unreachable code.
+4. `discover.yml`: `git pull --rebase` before push, with a bounded retry, so a concurrent
+   human push cannot silently lose the day's run.
+
+**Acceptance.** A red test blocks a merge. No document asserts something contradicted by
+the code. A deliberate `data/results.json` edit inside a run is caught by `changes.py`.
+
+**Risk.** None material. **Rollback.** Delete `ci.yml`.
+
+---
+
+## Sprint 5.2 — Make the judge actually decide · `planned`
+
+**Objective.** The judge currently costs money and produces nothing that survives. Fix that,
+and stop conflating "we did not ask" with "it could not tell".
+
+**Files.** `scripts/automation/merge.py` · `pipeline.py` · `matching.py` · `review.py`
+· `tests/automation/test_merge.py` · `tests/automation/test_judge.py` (new)
+
+**Deliverables**
+
+1. **Thread `matchedProblemId` through.** Accept it **only** if it appears in the shortlist
+   actually shown to the judge — never an id the model invented. Use it for `problemRef` on
+   candidates and for `problem_ref` on review entries.
+2. **Honour `requiresHumanReview`** and a configurable judge-confidence floor: route to
+   `review("judge_uncertain")` instead of creating a candidate.
+3. **Separate unavailability from uncertainty.** No key / error / exhausted budget ⇒ leave
+   the observation `extracted` so the next run retries it, and report
+   `judgeDeferred` / `judgeUnavailable` in the summary. Only a real verdict of
+   "cannot tell" may be terminal.
+4. **Emit `registry_conflict`** when one identifier claims two curated records, carrying the
+   colliding ids — it is a curated-data bug, not an ordinary ambiguity.
+5. **Emit `judge_failed`.** Together with 2 and 4 this retires all three dead review reasons.
+6. **Carry `outcome.notes` onto the review entry** so the curator sees why.
+
+**Validation.** A new `test_judge.py` exercising the judge path end to end — the existing
+`outcome()` helper defaults to a deterministic identifier match, which is exactly why these
+defects survived. Tests: judge id honoured; invented id rejected; `requiresHumanReview`
+routes to review; budget exhaustion is retried not terminal; registry collision surfaces as
+`registry_conflict`.
+
+**Acceptance.** Every field in the judge response schema is either used or removed from the
+schema. No review reason is declared and unemitted.
+
+**Risk.** Touching the decision path. Mitigated by the tests above landing first.
+
+---
+
+## Sprint 5.3 — Retrieval correctness · `planned`
+
+**Objective.** Retrieve what we believe we retrieve. Currently a busy query silently loses
+matches, and six of fourteen queries return nothing for reasons unknown.
+
+**Files.** `query_builder.py` · `twitter.py` · `ingest.py` · `config/automation.json`
+· `docs/automation/TWITTER_QUERY_STRATEGY.md`
+
+**Deliverables**
+
+1. **Server-side time windows.** Put `since_time` / `until_time` (or the verified
+   equivalent) into the query itself. Today the 30-hour lookback is applied *after* the API
+   has already chosen its 20 most recent results, so a query with 500 matches in the window
+   loses 480 of them unseen. **This is the single biggest recall defect.**
+2. **Adaptive window splitting.** When a window returns a full page, bisect it
+   (30h → 15h + 15h, recursively) until each sub-window is fully retrievable.
+3. **Fair per-query quota and a persistent backlog.** Replace `deduped[:max_obs]` with a
+   per-tier allocation, and write overflow to a real backlog file that the next run drains —
+   today the first query can consume the whole budget and starve trusted accounts.
+4. **Resolve K10.** Six queries returned exactly zero live. Length was tested and is *not*
+   the cause. Determine whether they are genuinely restrictive or structurally broken, and
+   record the answer. Needs API credit.
+
+**Validation.** A fixture whose window contains more items than one page proves nothing is
+lost. Backlog drains deterministically across runs. K10 answered in the strategy doc.
+
+**Blocked by.** TwitterAPI.io credit (currently HTTP 402).
+
+---
+
+## Sprint 5.4 — Data contracts, cost and identity · `planned`
+
+**Objective.** Make the persisted files match their declared models, stop paying for the
+same observation daily, and make candidate identity stable.
+
+**Files.** `models.py` · `merge.py` · `extraction.py` · `store.py` · `ids.py`
+· `config/automation.json`
+
+**Deliverables**
+
+1. **Real contract validation.** Declare every persisted field on `Observation` /
+   `Candidate` / `ReviewEntry` (`extractionCacheKey`, `extractionWarnings`, `matchMethod`,
+   `decision`, …) and validate with `TypeAdapter(list[Model])` **on read and before every
+   write**. Today the workflow checks only that the file is parseable JSON.
+2. **`review` becomes a stable state** in `needs_extraction`, so a reviewed observation is
+   not re-sent to Gemini every day.
+3. **Retry backoff for `extraction_failed`**: `extractionAttempts`, `lastAttemptAt`,
+   `nextRetryAt`, `failureType` — a permanently malformed post must not cost a call a day.
+4. **Stable candidate ids.** An id must not change when an identifier arrives. Assign once,
+   keep for life, and reconcile identifier changes by *merging* candidates, never renaming.
+5. **Tweet-text policy.** Commit excerpt + hash + URL; keep full text to the run and to a
+   short-retention artifact. Flip `storeTweetText` accordingly.
+
+**Validation.** A deliberately malformed persisted file fails validation loudly. A candidate
+that gains an arXiv id keeps its id. Second run over unchanged data makes zero paid calls.
+
+---
+
+## Sprint 5.5 — Real no-write end-to-end · `planned` — **the gate**
+
+**Objective.** Run the *whole* pipeline against real APIs without writing anything, and read
+the false-positive rate before trusting it.
+
+**Why it exists.** Today `--dry-run` on the schedule runs ingest only, and
+`extraction --dry-run` uses a stub model — so the scheduled dry run has never exercised
+Gemini, matching, the judge or the merge engine. `OPERATIONS.md` promised reviewable
+"review-queue reasons" from those runs, which was not achievable.
+
+**Files.** `scripts/automation/run_pipeline.py` (new orchestrator) · `discover.yml`
+· `OPERATIONS.md`
+
+**Deliverables**
+
+1. `run_pipeline --plan`: real Twitter, real Gemini, real matching and judging, candidates
+   and review queue built **in memory**, written only to an artifact and the Step Summary.
+   Repository untouched.
+2. Two distinct modes, named honestly: **offline fixture mode** (no keys, no network) and
+   **real-API no-write mode**.
+3. `discover.yml` uses `--plan` for scheduled dry runs, so the dry run finally exercises
+   the whole pipeline.
+4. Three real `--plan` runs; a written note recording observed precision, the review-reason
+   distribution, and the API cost per run.
+
+**Acceptance — and this is the gate to live writes.** `git status` clean after a `--plan`
+run; a human has read three runs' output; the false-positive rate is written down. Only
+then does `dryRunOnSchedule` flip to `false`.
+
+---
+
+## Sprint 6 — Multi-source + candidate entity resolution · `planned`
+
+**Objective.** Add higher-precision sources, and make cross-source deduplication actually
+possible.
+
+> The review is right that this ordering matters: the roadmap already promised
+> "Twitter + arXiv resolve to one candidate", and the current architecture **cannot deliver
+> it**, because matching never consults the candidate store. That must land *with* the new
+> sources, not after them.
+
+**Deliverables**
+
+1. **Candidate-to-candidate matching.** `match_observation` searches two indexes — the
+   curated registry *and* pending candidates — returning `matchedProblemRef` and/or
+   `matchedCandidateId`. Includes a merge path for two candidates with complementary
+   identifiers.
+2. **Evidence strength**, replacing the single boolean gate. Rename *corroboration gate* →
+   **external-reference gate** and tier it:
+   `reference_only < artifact_available < formal_artifact < paper_available <
+   independent_confirmation < registry_confirmation`.
+   A bare GitHub link is `reference_only` — enough to create a candidate internally, not
+   enough to be called corroborated.
+3. **arXiv** ingestion (free, structured, high precision).
+4. **erdosproblems.com + Tao's AI-contributions wiki** — already cited as sources in this
+   dataset.
+5. **GitHub** search for Lean artifact repositories.
+
+All sources emit the same `Observation` shape, so stages 3–7 stay unchanged.
+
+**Acceptance.** A Twitter observation and an arXiv observation about one problem resolve to
+**one** candidate, and a test proves it.
+
+---
+
+## Sprint 6.5 — Curator workflow · `planned`
+
+**Objective.** Close the loop from "signal" to "curated result" without hand-editing JSON.
+
+**Deliverables**
+
+```bash
+python -m scripts.automation.review_cli list [--reason ...]
+python -m scripts.automation.review_cli approve <id>
+python -m scripts.automation.review_cli dismiss <id>
+python -m scripts.automation.review_cli link <id> erdos-728
+python -m scripts.automation.promote_candidate <id> --draft
 ```
-scripts/requirements.txt              + pytest, httpx, rapidfuzz
-package.json                          fix the broken "lint" script
-config/twitter_queries.json           NEW
-scripts/automation/__init__.py        NEW
-scripts/automation/models.py          NEW  Observation, RawTweet (Pydantic)
-scripts/automation/urls.py            NEW  canonicalisation, tracking-param stripping
-scripts/automation/identifiers.py     NEW  arXiv / DOI / OEIS / Erdős / Lean extraction
-scripts/automation/ids.py             NEW  stable id derivation
-scripts/automation/twitter.py         NEW  TwitterAPI.io client behind an interface
-scripts/automation/ingest.py          NEW  fetch → normalise → dedupe → persist
-scripts/automation/store.py           NEW  atomic read/write JSON helpers
-data/automation/*.json                NEW  seeded empty
-tests/automation/…                    NEW  + fixtures
-```
 
-**Deliverables.** Query config; API client with timeouts, retries and rate-limit backoff;
-URL canonicalisation; identifier extraction; stable observation ids
-(`sha256("twitter:" + tweet_id)`); exact deduplication; atomic writes; `--dry-run`;
-processing-state persistence; fixtures + tests.
+`promote_candidate` **generates a proposed `results.json` entry and opens a draft PR**. It
+never edits the registry directly — promotion stays a human merge, which is the project's
+central promise.
 
-**Validation.** `pytest tests/automation -q` green with **no API keys present**;
-`python -m scripts.automation.ingest --dry-run --fixtures` reports proposed mutations and
-writes nothing; rerunning against the same fixture produces **zero** new records.
-
-**Acceptance criteria.** Idempotent reruns. No network access in tests. `results.json`
-byte-identical. `build_data.py` and `pnpm build` still pass.
-
-**Dependencies.** Sprint 0. **Risks.** TwitterAPI.io response shape may differ from the
-docs — mitigated by fixture-driven development and a tolerant parser.
-**Rollback.** Delete `scripts/automation/` and `data/automation/`; nothing else reads them.
-
----
-
-## Sprint 1.5 — Query strategy, syntax probe and calibration · `completed` **[amended, new]**
-
-**Objective.** Replace hand-written intuition queries with a measured, calibrated,
-configuration-driven search strategy — before the daily automation starts spending money on
-the wrong searches.
-
-> **[amended]** Not in the original plan. Added after a proposal review: Sprint 1's queries
-> were written from intuition, searched only for *success* claims, and used six account
-> handles written from memory. The live smoke test (15% corroboration) showed recall was the
-> binding constraint.
-
-**Files.** `.github/workflows/probe-twitter-syntax.yml`, `scripts/automation/probe_syntax.py`,
-`config/twitter_discovery.json` (replaces `config/twitter_queries.json`),
-`scripts/automation/query_builder.py`, `scripts/automation/calibrate.py`,
-`tests/automation/fixtures/gold_set.json`, `tests/automation/test_query_strategy.py`,
-`docs/automation/TWITTER_QUERY_STRATEGY.md`, `scripts/automation/twitter.py` (pacing),
-`scripts/automation/ingest.py` (taxonomy + telemetry).
-
-**Deliverables.** Operator support verified against the live API; request pacing after
-measuring 429s; keyword taxonomy with a template grammar; 14 queries across 3 tiers with
-per-family caps; dispute/verification/registry/arXiv families; probe-verified trusted
-accounts; gold-set calibration harness; per-query telemetry; strategy document.
-
-**Validation.** `python -m scripts.automation.calibrate` → 12/12 recall, 3/10 noise.
-73 tests green, no network, no keys. `results.json` byte-identical.
-
-**Acceptance criteria.** ✅ Syntax verified, not assumed. ✅ No handle enabled without probe
-verification (test-enforced). ✅ Dispute language searched. ✅ Recall and noise locked by tests.
-✅ Noisy families disableable from config alone.
-
-**Dependencies.** Sprint 1. **Risks.** Gold-set circularity — documented as blind spot 5.
-**Rollback.** Re-enable the previous flat query list; the ingest interface is unchanged.
-
----
-
-## Sprint 2 — Gemini structured extraction · `completed`
-
-**Objective.** Turn observation text into validated structured data, cached and versioned.
-
-**Files.** `scripts/automation/gemini.py`, `extraction.py`, `prompts/extraction_v1.md`,
-`models.py` (+ `ExtractionResult`), tests + mocked responses.
-
-**Deliverables.** Gemini client with timeout/retry; strict Pydantic `ExtractionResult`
-(all fields nullable — the model must never be forced to invent an identifier);
-`promptVersion` + `modelVersion` recorded on every extraction; cache keyed on
-`(observationId, promptVersion, modelVersion)`; failure marks the observation
-`extraction_failed` and **keeps the raw observation** for later reprocessing.
-
-**Validation.** Mocked-response tests for success, malformed JSON, schema-violating
-output, timeout, and rate-limit. Cache test: a second run makes **zero** API calls.
-
-**Acceptance criteria.** No unvalidated model output ever reaches disk. Engagement metrics
-are **not** included in the prompt. Extraction failure is non-destructive.
-
-**Dependencies.** Sprint 1. **Risks.** Structured-output drift between Gemini versions —
-mitigated by pinning the model id and versioning the schema.
-**Rollback.** Extraction is a separate stage; disable it and observations still accumulate.
-
----
-
-## Sprint 3 — Entity matching and shortlist · `completed`
-
-**Objective.** Decide *what an observation is about*, cheaply and deterministically first.
-
-**Files.** `scripts/automation/matching.py`, `aliases.py`,
-`prompts/judge_v1.md`, `data/automation/aliases.json`, tests.
-
-**Deliverables.** Deterministic identifier matching (arXiv, DOI, OEIS, Erdős number, Lean
-repo, canonical URL) → alias lookup → normalised-title similarity (RapidFuzz).
-Shortlist capped at 5 candidates. Relationship-judge schema with the seven decision
-values. Judge invoked **only** on ambiguous shortlists. **No embeddings** (assessment §2.4).
-
-**Validation.** Table-driven tests: exact Erdős-number match resolves without a model call;
-alias hit resolves without a model call; ambiguous case produces a shortlist and *calls the
-mocked judge exactly once*; judge failure routes to review.
-
-**Acceptance criteria.** Deterministic identifiers always beat model output. Judge is never
-called when a deterministic match exists. Conflicting explicit identifiers **never** merge.
-
-**Dependencies.** Sprint 2. **Risks.** Alias table cold-start — seeded from existing
-`title` + `erdosNumber` values in `results.json`.
-**Rollback.** Fall back to "everything ambiguous → review queue".
-
----
-
-## Sprint 4 — Safe merge engine and review queue · `completed`
-
-**Objective.** Apply decisions deterministically, in Python, with a field allowlist.
-
-**Files.** `scripts/automation/merge.py`, `review.py`, `policy.py`, tests.
-
-**Deliverables.** One handler per decision value (per the brief's table). **Field allowlist**
-(assessment §2.6): automation may never write `status: audited`, `auditedAt`, `impact`,
-`assessment`, `confidence`, `auditNotes`, `provenanceNote`, and may never delete a curated
-record. **Corroboration gate** (assessment §2.1): a Twitter-only observation with no
-external identifier becomes a review-queue entry, not a candidate. Review queue with typed
-reasons. Conflict preservation — both claims retained, neither overwritten.
-
-**Validation.** Tests for every decision branch; `test_no_automatic_audited_promotion`;
-`test_no_automatic_impact_write`; `test_curated_results_unchanged` (hash `results.json`
-before/after a full pipeline run); idempotent-rerun test; corrupted-JSON handling.
-
-**Acceptance criteria.** A full fixture run leaves `data/results.json` **byte-identical**.
-Every uncertain case is recoverable from `review_queue.json`.
-
-**Dependencies.** Sprint 3. **Risks.** Over-eager merging — mitigated by defaulting every
-unhandled case to review. **Rollback.** `candidates.json` / `review_queue.json` are
-additive; deleting them restores the prior state.
-
----
-
-## Sprint 5 — Scheduled GitHub Actions workflow · `completed`
-
-**Objective.** Run daily, safely, without loops or noise commits.
-
-**Files.** `.github/workflows/discover.yml` (new), `docs/automation/OPERATIONS.md` (new).
-`deploy-pages.yml` is **not** modified.
-
-**Deliverables.** `schedule` (`20 4 * * *` UTC = 07:20 EEST / 06:20 EET, DST drift
-documented) + `workflow_dispatch` with a `dry_run` input. Secret validation that fails
-fast **without printing values**. `concurrency: group: discover, cancel-in-progress: false`.
-`contents: write` on the collector only. Commit only on meaningful data change. Per-run
-caps logged into `processing_state.json`.
-
-**Validation.** `workflow_dispatch` with `dry_run: true` completes and commits nothing.
-A real run commits only `data/automation/**` and triggers exactly one deploy.
-A forced API failure leaves all existing JSON intact.
-
-**Acceptance criteria.** No commit loop. No secret in logs. Live site still deploys.
-
-**Dependencies.** Sprint 4 + the two user-provided secrets.
-**Risks.** Scheduled-workflow disablement after 60 days of repo inactivity (GitHub
-behaviour) — documented in OPERATIONS.md.
-**Rollback.** Disable the workflow in the Actions tab; deployment is unaffected.
-
----
-
-## Sprint 6 — Additional high-precision sources · `planned` **[amended, new]**
-
-**Objective.** Reduce dependence on X and strengthen the corroboration gate.
-
-**Files.** `scripts/automation/sources/{arxiv,erdosproblems,github}.py`,
-`config/sources.json`, tests.
-
-**Deliverables.** arXiv API client (free, structured); erdosproblems.com + Tao's
-`teorth/erdosproblems` AI-contributions wiki reader; GitHub search for Lean artifact repos.
-All emit the **same `Observation` shape** as Twitter, so steps 3–7 are unchanged.
-
-**Validation.** Fixture tests per source; a cross-source corroboration test (a Twitter
-observation plus a matching arXiv observation resolves to one candidate, corroborated).
-
-**Acceptance criteria.** Adding a source requires no change to matching or merge code.
-
-**Dependencies.** Sprint 5. **Risks.** HTML scraping fragility for erdosproblems — prefer
-its structured endpoints / the wiki's markdown. **Rollback.** Per-source enable flag.
+**Acceptance.** A candidate can go from queue to draft PR without a text editor, and no path
+in the tool can write `results.json`.
 
 ---
 
 ## Sprint 7 — Frontend candidate visibility (optional) · `planned`
 
-**Objective.** Surface unverified signals without contaminating curated metrics.
-
-**Files.** `scripts/build_data.py` (emit `public/data/candidates.json` — **separately**),
-`src/hooks/useCandidates.ts`, `src/components/SignalsFromX.tsx`, `src/app/App.tsx`.
-
-**Deliverables.** A visually and semantically separate "Signals from X — unverified"
-section: unverified badge, source, author, discovery date, original post date, extracted
-problem name, relationship to an existing result when known, review status, link to source.
-
-**Validation.** A test asserting `computeMetrics` output is **identical** with and without
-candidates loaded. Candidates must not appear in KPIs, the constellation, the deficit
-chart, the lab charts or the ledger.
-
-**Acceptance criteria.** Zero effect on any curated number. Clearly not presented as fact.
-
-**Dependencies.** Sprint 4 (data) — deliberately gated on observed false-positive rate.
-**Risks.** Publishing unverified claims under this project's name is a reputational risk;
-this is precisely why it is last and optional. **Rollback.** Remove the component.
+Unchanged, and still last. A "Signals from X — unverified" section, visually and
+semantically separate, with zero effect on any curated metric (test-enforced). Deliberately
+gated on the false-positive rate measured in 5.5 — publishing unverified claims under this
+project's name is the reputational risk the whole design exists to avoid.
 
 ---
 
 ## Sprint 8 — Hardening and operational documentation · `planned`
 
-**Objective.** Make it operable by a human who has forgotten how it works.
-
-**Deliverables.** End-to-end fixture run; API-call/cost metrics in `processing_state.json`;
-`OPERATIONS.md` covering manual run, dry run, inspecting the review queue, recovering from
-a failed run, disabling automation, and rotating secrets; final documentation sync.
-
-**Validation.** A fresh clone can run the full dry-run path with no secrets.
-
-**Acceptance criteria.** Every question in the brief's "final report" list is answered by a
-document in the repository, not only by a chat message.
+End-to-end fixture run, cost metrics, recovery procedures, and a final documentation sync.
 
 ---
 
-## Cross-cutting invariants (every sprint)
+## Cross-cutting invariants (unchanged)
 
 1. `data/results.json` is never written by automation.
-2. `scripts/build_data.py` reads **only** `results.json`.
+2. `build_data.py` reads only `results.json`.
 3. Tests never require real API keys.
-4. Every write is atomic (`*.tmp` → `os.replace`).
+4. Every write is atomic.
 5. An API failure never replaces good data with empty data.
-6. `pnpm build` and `python scripts/build_data.py` pass at the end of every sprint.
+6. `pnpm build` and `build_data.py` pass at the end of every sprint.
 7. The live GitHub Pages deployment keeps working.
+8. **New:** no review reason is declared without a code path that emits it.
+9. **New:** no field is requested from a model without a code path that reads it.
