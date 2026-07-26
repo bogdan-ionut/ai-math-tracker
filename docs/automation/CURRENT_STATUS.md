@@ -33,7 +33,7 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (423), and CI gates every merge |
+| Local test coverage | good (451), and CI gates every merge |
 | Retrieval correctness | sound — window server-side, cap shared round-robin, surplus carried |
 | Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | validated against the models on every read and write |
@@ -67,7 +67,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | ~~R12~~ | ~~`changes.py` unexpected check unreachable~~ | ✅ | closed 5.1 |
 | ~~R13~~ | ~~README claims there is no scraper~~ | ✅ | closed 5.1 |
 | ~~R10~~ | ~~`storeTweetText: true` commits third-party text~~ | ✅ | closed 5.4 |
-| **R8** | No curator workflow | 🟡 minor | 6.5 |
+| ~~R8~~ | ~~No curator workflow~~ — `curate` CLI, promote → draft PR | ✅ | closed 6.5 |
 | ~~K11~~ | ~~TwitterAPI.io out of credit~~ | ✅ | topped up 2026-07-25 |
 | **K6** | Only 13/40 curated records carry a source URL | 🟡 minor | human backfill |
 | **K8** | `teorth` / `erdosproblems` handles unconfirmed | 🟡 minor | opportunistic |
@@ -104,7 +104,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 423 / 423 (`python -m pytest`) — no network, no API keys.
+**Passing:** 451 / 451 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
 was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
@@ -114,6 +114,30 @@ every one of 232 tests took the branch that has no judge in it.
 ---
 
 ## Completed since the re-plan
+
+### Sprint 6.5 — the curator's workbench ✅
+
+Also done without a model call.
+
+Automation had been filling a review queue and a candidate store for several sprints with no
+way to act on either except editing JSON by hand. A queue nobody can work is a queue nobody
+works. `python -m scripts.automation.curate` gives `queue`, `candidates`, `show`, `promote`
+and `dismiss`.
+
+**`promote` opens a draft pull request rather than editing the registry.** A curator command
+that wrote `data/results.json` directly would technically be a human action — but it would
+put registry-writing code inside the automation package, one import away from the scheduled
+workflow, and the project's strongest guarantee would then rest on nobody ever calling it.
+Instead the proposal lands on a branch and arrives through review like any other change.
+
+**A proposal arrives with every judgement empty.** All seven `neverAutoWriteFields` come out
+`null`, and the PR body carries them as an unticked checklist. A proposal pre-filled with an
+impact score and an assessment would be inviting a rubber stamp. `status` enters as
+`provisional`, the weakest tier the schema allows, and the body states the bar for `audited`:
+a paper, a Lean artifact, or expert confirmation — an announcement is not a confirmation.
+
+The body also flags a possible duplicate. Tried against a real candidate carrying
+`arxiv:2607.16356`, it correctly matched the existing `cycle-double-cover` record.
 
 ### Sprint 6 (part) — candidate matching and evidence tiers ✅
 

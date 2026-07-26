@@ -20,8 +20,8 @@ further defects in the judge stage.
 | **5.3** | **Retrieval correctness** | **completed** |
 | **5.4** | **Data contracts, cost and identity** | **completed** |
 | **5.5** | **Real no-write end-to-end → gate to live writes** | **completed — gate blocked on K12** |
-| 6 | Multi-source + candidate entity resolution | planned |
-| 6.5 | Curator workflow | planned |
+| 6 | Multi-source + candidate entity resolution | **partly done** (R5, R6 closed; extra sources pending) |
+| 6.5 | Curator workflow | **completed** |
 | 7 | Frontend candidate visibility (optional) | planned |
 | 8 | Hardening and operational documentation | planned |
 
