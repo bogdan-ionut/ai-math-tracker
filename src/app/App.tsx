@@ -7,6 +7,8 @@ import { useTheme } from "@/hooks/useTheme";
 import { applyFilters, computeMetrics } from "@/lib/filters";
 import { Masthead } from "@/components/Masthead";
 import { FilterBar } from "@/components/FilterBar";
+import { EvidenceBar } from "@/components/EvidenceBar";
+import { RecordsVsProblems } from "@/components/RecordsVsProblems";
 import { Landmarks } from "@/components/Landmarks";
 import { ImpactConstellation } from "@/components/charts/ImpactConstellation";
 import { CumulativeTimeline } from "@/components/charts/CumulativeTimeline";
@@ -75,6 +77,14 @@ export function App() {
             />
 
             <div className="space-y-10">
+              {/* F2. Framing before figures: what the evidence actually is, and
+                  that the corpus is entries rather than problems. Both respond
+                  to the filter bar, so they always describe what is on screen. */}
+              <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
+                <EvidenceBar rows={filtered} />
+                <RecordsVsProblems rows={filtered} />
+              </div>
+
               <Landmarks rows={filtered} onSelect={setSelected} />
 
               <Card>

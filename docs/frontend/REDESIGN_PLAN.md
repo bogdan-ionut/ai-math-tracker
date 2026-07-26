@@ -215,12 +215,32 @@ states the situation accurately either way. **See K13.**
 14 tests. The load-bearing ones assert no figure is hardcoded in the components and that the
 deficiency is never rendered green.
 
-### F2 — The evidence bar and the batch disclosure
+### F2 — The evidence bar and the batch disclosure · `completed 2026-07-26`
 **Objective.** Reframe the top of the page from volume to evidence.
 **Files.** new `EvidenceBar.tsx`, `RecordsVsProblems.tsx` · `App.tsx` · `lib/filters.ts`
 **Deliverables.** Sections 2 and 3. Hover gives both record and problem counts everywhere.
 **Acceptance.** Both figures reachable for every segment; batch records visibly marked.
 **Risk.** Two new charts above the fold; must not push the timeline below it on mobile.
+
+**Delivered.** `lib/evidence.ts` (pure), `EvidenceBar.tsx`, `RecordsVsProblems.tsx`, both
+responding to the filter bar so they always describe what is on screen. Rendered as flex
+children rather than through ECharts: exact, weightless, and it keeps a 564 kB charting runtime
+off the top of the page.
+
+**What building it exposed.** The record-level figure understated the problem badly. In records
+the audited tier is 12 of 17 unsourced. In *problems* it is **65 of 70** — because the large
+batches are precisely the audited-unsourced ones. Roughly 93% of the audited problem count rests
+on records with nothing to link to, and no previous framing of this number showed that.
+
+Also measured: **72% of the problem count comes from 5 batch entries, and 2 entries account for
+half of it.** The earlier estimate in §1.2 said 67% from 4; the correct figures are above.
+
+One contradiction was introduced and fixed during the work: the card totalled 123 problems while
+the masthead says 121, because the headline excludes disputed. Rather than hide the difference
+the card now states it.
+
+**Not covered by tests.** There is no frontend test runner yet, so `lib/evidence.ts` is verified
+only by DOM assertions in a browser. F5 introduces vitest; these functions are its first target.
 
 ### F3 — Fix the lab comparison
 **Objective.** Retire the most misleading chart on the page.
