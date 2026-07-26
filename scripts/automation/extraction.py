@@ -264,6 +264,8 @@ def run(
             model_client = GeminiClient(
                 model=model_name,
                 timeout=ex.get("timeoutSeconds", 60),
+                max_retries=ex.get("maxRetries", 3),
+                min_interval=ex.get("minRequestIntervalSeconds", 4.0),
             )
 
     by_id = {o["id"]: o for o in observations}

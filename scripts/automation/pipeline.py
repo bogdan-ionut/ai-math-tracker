@@ -93,6 +93,8 @@ def run(dry_run: bool = False, judge_client: StructuredModel | None = None,
             _judge_state["client"] = GeminiClient(
                 model=jcfg.get("model", "gemini-3.6-flash"),
                 timeout=jcfg.get("timeoutSeconds", 60),
+                max_retries=jcfg.get("maxRetries", 3),
+                min_interval=jcfg.get("minRequestIntervalSeconds", 4.0),
             )
         except GeminiError as exc:
             _judge_state["error"] = str(exc)

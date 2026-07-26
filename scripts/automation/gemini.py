@@ -44,7 +44,8 @@ class GeminiClient:
         timeout: float = 60.0,
         max_retries: int = 3,
         backoff: float = 2.0,
-        min_interval: float = 1.0,
+        min_interval: float = 4.0,
+        max_interval: float = 60.0,
         base_url: str = BASE_URL,
     ) -> None:
         key = api_key if api_key is not None else os.environ.get("GEMINI_API_KEY", "")
@@ -59,6 +60,15 @@ class GeminiClient:
         self._max_retries = max_retries
         self._backoff = backoff
         self._min_interval = min_interval
+        # Adaptive. The old client escalated its delay *within* one call's
+        # retries and then reset to the floor for the next observation, so a
+        # sustained rate limit produced a storm: 121 calls for 50 observations,
+        # 32 of them failing on HTTP 429. TwitterAPI.io taught this exact lesson
+        # in Sprint 1.5 — pace, do not merely retry — and it was never carried
+        # over to this client.
+        self._interval = min_interval
+        self._max_interval = max_interval
+        self.throttled_count = 0
         self._last_call_at = 0.0
         self._base_url = base_url.rstrip("/")
         self.call_count = 0
@@ -66,12 +76,21 @@ class GeminiClient:
     # -- internals ---------------------------------------------------------
 
     def _pace(self) -> None:
-        if self._min_interval <= 0:
+        if self._interval <= 0:
             return
         elapsed = time.monotonic() - self._last_call_at
-        if self._last_call_at and elapsed < self._min_interval:
-            time.sleep(self._min_interval - elapsed)
+        if self._last_call_at and elapsed < self._interval:
+            time.sleep(self._interval - elapsed)
         self._last_call_at = time.monotonic()
+
+    def _throttled(self) -> None:
+        """Slow down for *every subsequent call*, not just this one's retries."""
+        self._interval = min(self._interval * 2, self._max_interval)
+        self.throttled_count += 1
+
+    def _went_through(self) -> None:
+        """Ease back toward the floor, slowly enough not to re-trip the limit."""
+        self._interval = max(self._min_interval, self._interval * 0.9)
 
     def _post(self, payload: dict) -> dict:
         url = f"{self._base_url}/models/{self.model}:generateContent"
@@ -85,6 +104,7 @@ class GeminiClient:
                 with httpx.Client(timeout=self._timeout) as client:
                     resp = client.post(url, json=payload, headers=headers)
                 if resp.status_code == 200:
+                    self._went_through()
                     return resp.json()
                 if resp.status_code in (402, 403):
                     raise GeminiError(
@@ -92,13 +112,15 @@ class GeminiClient:
                         "retrying will not help"
                     )
                 if resp.status_code in (429, 500, 502, 503, 504):
+                    if resp.status_code == 429:
+                        self._throttled()
                     last = GeminiError(f"HTTP {resp.status_code} from generateContent")
                     if attempt < self._max_retries:
                         retry_after = resp.headers.get("retry-after")
                         if retry_after and retry_after.isdigit():
                             delay = float(retry_after)
                         elif resp.status_code == 429:
-                            delay = max(self._backoff, self._min_interval) * (2 ** attempt)
+                            delay = max(self._backoff, self._interval) * (2 ** attempt)
                         else:
                             delay = self._backoff * attempt
                         time.sleep(min(delay, 30.0))
