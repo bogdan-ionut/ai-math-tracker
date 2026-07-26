@@ -6,16 +6,20 @@
 
 **Last updated:** 2026-07-26
 **Phase:** executing the revised plan
-**Next sprint:** 5.5 — Real no-write end-to-end → gate to live writes
-**Live writes:** 🔴 **disabled** (`dryRunOnSchedule: true`) — gate is Sprint 5.5
+**Next sprint:** frontend F1 (see [../frontend/REDESIGN_PLAN.md](../frontend/REDESIGN_PLAN.md)) — the backend queue is empty apart from U9
+**Live writes:** 🔴 **disabled** (`dryRunOnSchedule: true`) — gated on U9, the Gemini daily cap
 
 ---
 
 ## Where the project is
 
-Sprints 0–5 are delivered: ingestion, extraction, matching, the merge engine with its
-guardrails, and a scheduled workflow. 232 tests pass with no network and no API keys, and
-`data/results.json` has never been written by automation.
+Sprints 0–7 are delivered: ingestion, extraction, matching, the merge engine with its
+guardrails, a scheduled workflow, CI, a real no-write end-to-end plan run, arXiv reference
+verification, a curator CLI, and automated signals on the site. 502 tests pass with no network
+and no API keys, and `data/results.json` has never been written by automation.
+
+Every defect from the external review and the follow-up audit is now closed. The one thing
+standing between this and live writes is a billing decision (U9).
 
 An external review then assessed the pipeline before enabling live writes. **All 15 of its
 claims were verified against the code and all 15 are accurate.** A follow-up five-lens audit
@@ -37,7 +41,7 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 | Retrieval correctness | sound — window server-side, cap shared round-robin, surplus carried |
 | Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | validated against the models on every read and write |
-| Empirical calibration | plan run works end to end; **Gemini is 429ing every call** — see K12 |
+| Empirical calibration | plan run works end to end; extraction capped by the Gemini **free-tier daily** allowance (K12) |
 
 ---
 
