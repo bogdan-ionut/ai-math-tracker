@@ -96,7 +96,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | ✅ U1/U2 | Repository secrets added | done |
 | ✅ U3 | Actions workflow permissions set to read/write | done |
 | ✅ U7 | TwitterAPI.io topped up | done 2026-07-25 |
-| **U9** | **Check the Gemini API key's quota/billing — every call is 429ing (K12)** | **blocks the gate** |
+| **U9** | **Enable Gemini billing, or accept ~30 extractions/day** — K12 is the free-tier *daily* cap, named by the API | **blocks the gate** |
 | U6 | After Sprint 5.5: read three real no-write runs, then flip `dryRunOnSchedule` | the gate |
 | U8 | *(optional)* Confirm the correct `teorth` / `erdosproblems` handles by hand | opportunistic |
 
@@ -114,6 +114,28 @@ every one of 232 tests took the branch that has no judge in it.
 ---
 
 ## Completed since the re-plan
+
+### K12 diagnosed by name (2026-07-26)
+
+The quota reset, and a fresh run identified the constraint precisely:
+
+    quotaReason  GenerateRequestsPerDayPerProjectPerModel-FreeTier
+
+The smoke test passed cleanly — three calls, three correct verdicts, no 429. The full plan run
+then got **six calls** before the daily allowance ran out. So K12 is not rate limiting and not
+a code defect: it is the free tier's **daily** cap, and the pipeline needs roughly 30–50
+extraction calls per run.
+
+The Sprint 5.5 machinery did exactly what it was built for. It read the quota class out of the
+429 rather than guessing, treated a `PerDay` quota as terminal instead of retrying something
+waiting cannot fix, and the circuit breaker stopped the stage after five consecutive failures
+with no success — **68 seconds instead of 768**, and a report that names the cause instead of
+looking like a slow day.
+
+`verify_refs` ran in the same pass and resolved a reference against arXiv, which needs no key.
+Guardrails held: repository untouched, curated registry safe.
+
+**This is a billing decision, not an engineering one (U9).**
 
 ### Sprint 6 (rest) — resolve claimed references against arXiv ✅
 
