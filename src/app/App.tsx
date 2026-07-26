@@ -9,10 +9,10 @@ import { Masthead } from "@/components/Masthead";
 import { FilterBar } from "@/components/FilterBar";
 import { EvidenceBar } from "@/components/EvidenceBar";
 import { RecordsVsProblems } from "@/components/RecordsVsProblems";
+import { LabComparison } from "@/components/LabComparison";
 import { Landmarks } from "@/components/Landmarks";
 import { ImpactConstellation } from "@/components/charts/ImpactConstellation";
 import { CumulativeTimeline } from "@/components/charts/CumulativeTimeline";
-import { LabBars } from "@/components/charts/LabBars";
 import { LabLanes } from "@/components/charts/LabLanes";
 import { FortnightGrid } from "@/components/charts/FortnightGrid";
 import { Ledger } from "@/components/Ledger";
@@ -99,10 +99,11 @@ export function App() {
 
               <LabLanes rows={filtered} themeKey={themeKey} onSelect={setSelected} />
 
-              <div className="grid gap-6 lg:grid-cols-2">
-                <FortnightGrid rows={filtered} themeKey={themeKey} onSelect={setSelected} />
-                <LabBars m={metrics} themeKey={themeKey} />
-              </div>
+              {/* F3. LabBars plotted problems per lab and read as a league
+                  table, which the data cannot support — see LabComparison. */}
+              <LabComparison rows={filtered} />
+
+              <FortnightGrid rows={filtered} themeKey={themeKey} onSelect={setSelected} />
 
               <Ledger rows={filtered} onSelect={setSelected} />
               <MethodologyFooter summary={summary} />

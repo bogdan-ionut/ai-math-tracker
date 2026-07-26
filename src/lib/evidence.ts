@@ -143,3 +143,71 @@ export function batchShape(rows: MathResult[]): BatchShape {
     recordsForHalf: problems > 0 ? recordsForHalf : 0,
   };
 }
+
+export interface LabShape {
+  key: string;
+  /** Entries. The count of separate things somebody wrote down. */
+  records: number;
+  /** Entries a curator audited. The count of separate verification decisions. */
+  auditedRecords: number;
+  problems: number;
+  auditedProblems: number;
+  /** Audited problems on records with no source link. */
+  auditedUnsourcedProblems: number;
+  /** Audited *entries* with no source link. Tracked separately because a bar
+   *  that shows audits as solid implies a sourcing they do not have. */
+  auditedUnsourcedRecords: number;
+  /** The single biggest entry, and what share of the lab it carries. */
+  largest: { id: string; title: string; count: number; share: number } | null;
+  /** True when one entry supplies more than half this lab's problems. */
+  dominatedByOneEntry: boolean;
+}
+
+/**
+ * Per-lab shape, in the two units that disagree.
+ *
+ * The old chart plotted problems per lab and read as an institutional league
+ * table: DeepMind 53 of 53 audited, OpenAI 15 of 57. That is arithmetically
+ * true and almost the opposite of what happened.
+ *
+ * DeepMind has **four entries**. One of them is 44 OEIS conjectures audited as
+ * a single unit, and 52 of its 53 audited problems carry no source link.
+ * OpenAI has 23 entries and 11 separate audits. Counted as verification
+ * decisions rather than problem totals, OpenAI made nearly three times as many
+ * as DeepMind — which is the reverse of the impression the chart gave.
+ *
+ * So records come first here, and problems second.
+ */
+export function labShapes(rows: MathResult[]): LabShape[] {
+  const by = new Map<string, MathResult[]>();
+  for (const r of rows) {
+    by.set(r.labKey, [...(by.get(r.labKey) ?? []), r]);
+  }
+
+  return [...by.entries()]
+    .map(([key, rs]) => {
+      const problems = rs.reduce((n, r) => n + r.count, 0);
+      const audited = rs.filter((r) => r.status === "audited");
+      const biggest = [...rs].sort((a, b) => b.count - a.count)[0];
+      const share = problems ? biggest.count / problems : 0;
+      return {
+        key,
+        records: rs.length,
+        auditedRecords: audited.length,
+        problems,
+        auditedProblems: audited.reduce((n, r) => n + r.count, 0),
+        auditedUnsourcedProblems: audited
+          .filter((r) => !r.sources || r.sources.length === 0)
+          .reduce((n, r) => n + r.count, 0),
+        auditedUnsourcedRecords: audited.filter(
+          (r) => !r.sources || r.sources.length === 0,
+        ).length,
+        largest:
+          biggest.count > 1
+            ? { id: biggest.id, title: biggest.title, count: biggest.count, share }
+            : null,
+        dominatedByOneEntry: biggest.count > 1 && share > 0.5,
+      };
+    })
+    .sort((a, b) => b.records - a.records || b.problems - a.problems);
+}

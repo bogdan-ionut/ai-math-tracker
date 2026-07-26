@@ -242,7 +242,7 @@ the card now states it.
 **Not covered by tests.** There is no frontend test runner yet, so `lib/evidence.ts` is verified
 only by DOM assertions in a browser. F5 introduces vitest; these functions are its first target.
 
-### F3 — Fix the lab comparison
+### F3 — Fix the lab comparison · `completed 2026-07-26`
 **Objective.** Retire the most misleading chart on the page.
 **Files.** `LabBars.tsx` → `LabComparison.tsx` · `Landmarks.tsx`
 **Deliverables.** Section 5. Paired record/problem bars; automatic annotation when one record
@@ -250,6 +250,28 @@ supplies over half a lab's problems.
 **Acceptance.** DeepMind's 100% no longer readable as 53 independent verifications. Test on
 the real distribution.
 **Risk.** Loses a visually clean bar chart. Correct trade.
+
+**Delivered.** `LabBars.tsx` deleted; `LabComparison.tsx` and `labShapes()` replace it. Entries
+lead, problems follow, and both tracks mark audited-unsourced with the same hatching the
+evidence bar uses. Two annotations fire automatically: when one entry carries over half a lab's
+problems, and when audited work has no source link.
+
+**What it now says, in the reader's first glance:**
+
+| | entries | audits | problems | one entry carries | audited work unsourced |
+|---|---|---|---|---|---|
+| OpenAI | 23 | 11 | 57 | — | 8 of 11 entries · 12 of 15 problems |
+| DeepMind | 4 | 4 | 53 | **83%** (AlphaProof Nexus, 44 OEIS) | 3 of 4 entries · **52 of 53 problems** |
+
+The old chart's "DeepMind 100% vs OpenAI 26%" was not merely overstated, it inverted the
+story. Counted as verification *decisions*, OpenAI made 11 to DeepMind's 4.
+
+**A defect found and fixed mid-sprint.** The entries track initially rendered all audits solid
+while only the problems track hatched the unsourced ones — so the bar implied 4 cleanly sourced
+DeepMind audits when 3 of the 4 have no source. Both tracks now carry `auditedUnsourcedRecords`
+and `auditedUnsourcedProblems` separately.
+
+**Still untested.** Same gap as F2: no frontend runner until F5.
 
 ### F4 — Evidence in the ledger, provenance in the drawer
 **Objective.** Make the pipeline's vocabulary legible per record.
