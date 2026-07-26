@@ -35,6 +35,26 @@ class StructuredModel(Protocol):
         ...
 
 
+def _quota_reason(resp) -> str | None:
+    """Pull the machine-readable quota id out of a 429, and nothing else.
+
+    Gemini distinguishes a per-minute rate limit from an exhausted daily
+    allowance, and the two need opposite responses: wait, versus stop. Only
+    structured metadata is read — never the message body, which can echo the
+    request content back into logs.
+    """
+    try:
+        payload = resp.json()
+    except Exception:
+        return None
+    for detail in (payload.get("error") or {}).get("details") or []:
+        for violation in detail.get("violations") or []:
+            qid = violation.get("quotaId") or violation.get("quotaMetric")
+            if qid:
+                return str(qid)
+    return None
+
+
 class GeminiClient:
     def __init__(
         self,
@@ -69,6 +89,7 @@ class GeminiClient:
         self._interval = min_interval
         self._max_interval = max_interval
         self.throttled_count = 0
+        self.last_quota_reason: str | None = None
         self._last_call_at = 0.0
         self._base_url = base_url.rstrip("/")
         self.call_count = 0
@@ -114,7 +135,23 @@ class GeminiClient:
                 if resp.status_code in (429, 500, 502, 503, 504):
                     if resp.status_code == 429:
                         self._throttled()
-                    last = GeminiError(f"HTTP {resp.status_code} from generateContent")
+                        reason = _quota_reason(resp)
+                        if reason:
+                            self.last_quota_reason = reason
+                        if reason and "PerDay" in reason:
+                            # A daily quota does not recover by waiting a few
+                            # seconds. Retrying is pure waste, and worse, it
+                            # looks like a pacing problem for the rest of the
+                            # run when it is nothing of the kind.
+                            raise GeminiError(
+                                f"HTTP 429 — daily quota exhausted ({reason}); "
+                                "retrying will not help today"
+                            )
+                    last = GeminiError(
+                        f"HTTP {resp.status_code} from generateContent"
+                        + (f" ({self.last_quota_reason})" if resp.status_code == 429
+                           and self.last_quota_reason else "")
+                    )
                     if attempt < self._max_retries:
                         retry_after = resp.headers.get("retry-after")
                         if retry_after and retry_after.isdigit():

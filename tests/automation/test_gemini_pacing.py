@@ -76,3 +76,43 @@ class TestDefaults:
         c = GeminiClient(api_key="test-key-not-real", min_interval=0)
         c._pace()          # must not sleep or raise
         assert c._interval == 0
+
+
+class TestQuotaIsNotRateLimiting:
+    """A per-minute limit and an exhausted daily allowance both return 429 and
+    need opposite responses: wait, versus stop. The third plan run burned its
+    whole 720s budget waiting out something that waiting could not fix."""
+
+    class Resp:
+        def __init__(self, payload, status=429):
+            self._payload, self.status_code, self.headers = payload, status, {}
+
+        def json(self):
+            return self._payload
+
+    def _violation(self, quota_id):
+        return {"error": {"details": [{"violations": [{"quotaId": quota_id}]}]}}
+
+    def test_the_quota_id_is_extracted(self):
+        from scripts.automation.gemini import _quota_reason
+        resp = self.Resp(self._violation("GenerateRequestsPerDayPerProject"))
+        assert _quota_reason(resp) == "GenerateRequestsPerDayPerProject"
+
+    def test_a_body_without_violations_yields_nothing(self):
+        from scripts.automation.gemini import _quota_reason
+        assert _quota_reason(self.Resp({"error": {"message": "slow down"}})) is None
+
+    def test_an_unparseable_body_is_not_fatal(self):
+        from scripts.automation.gemini import _quota_reason
+
+        class Bad:
+            def json(self):
+                raise ValueError("not json")
+        assert _quota_reason(Bad()) is None
+
+    def test_only_structured_metadata_is_read(self):
+        """The message body can echo request content; it must never be logged."""
+        from scripts.automation.gemini import _quota_reason
+        payload = self._violation("GenerateRequestsPerMinute")
+        payload["error"]["message"] = "SECRET PROMPT TEXT"
+        assert "SECRET" not in str(_quota_reason(self.Resp(payload)))

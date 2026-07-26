@@ -26,7 +26,8 @@
     "minRequestIntervalSeconds": 4.0,
     "maxRetries": 3,
     "$pacingComment": "Gemini returns 429 under sustained load: the first real end-to-end run failed 32 of 50 extractions this way, burning 121 calls. The client now paces at this interval and doubles it for subsequent calls on each 429, easing back after successes.",
-    "maxWallClockSeconds": 720
+    "maxWallClockSeconds": 720,
+    "abortAfterConsecutiveFailures": 5
   },
   "judge": {
     "provider": "gemini",

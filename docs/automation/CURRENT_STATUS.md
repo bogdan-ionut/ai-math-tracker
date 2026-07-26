@@ -33,11 +33,11 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (372), and CI gates every merge |
+| Local test coverage | good (400), and CI gates every merge |
 | Retrieval correctness | sound — window server-side, cap shared round-robin, surplus carried |
 | Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | validated against the models on every read and write |
-| Empirical calibration | **none** — the scheduled dry run has never exercised Gemini |
+| Empirical calibration | plan run works end to end; **Gemini is 429ing every call** — see K12 |
 
 ---
 
@@ -54,11 +54,11 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | ~~A4~~ | ~~Registry identifier collision erased~~ | ✅ | closed 5.2 |
 | ~~A5~~ | ~~Four review reasons declared but never emitted~~ | ✅ | closed 5.2 |
 | ~~R2~~ | ~~No server-side time window~~ — `since_time`/`until_time`; date form found broken | ✅ | closed 5.3 |
-| **R1** | Scheduled dry run skips extraction and pipeline entirely | 🔴 critical | 5.5 |
 | **R5** | Matching never searches the candidate store | 🟠 major | 6 |
 | ~~R15+~~ | ~~`candidate_id` unstable under identifier acquisition~~ | ✅ | closed 5.4 |
 | ~~R3~~ | ~~`review` observations re-extracted daily~~ — plus retry backoff | ✅ | closed 5.4 |
 | ~~R4~~ | ~~Pydantic models do not validate persisted files~~ | ✅ | closed 5.4 |
+| ~~R1~~ | ~~Scheduled dry run skips extraction and pipeline~~ — now a full plan run | ✅ | closed 5.5 |
 | ~~R11~~ | ~~Unfair per-run cap; overflow counted, not queued~~ | ✅ | closed 5.3 |
 | ~~K10~~ | ~~Six of fourteen queries return zero~~ — TwitterAPI.io truncates at 512 chars | ✅ | closed 5.3 |
 | **R6** | Corroboration accepts a bare GitHub link | 🟠 major | 6 |
@@ -96,6 +96,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | ✅ U1/U2 | Repository secrets added | done |
 | ✅ U3 | Actions workflow permissions set to read/write | done |
 | ✅ U7 | TwitterAPI.io topped up | done 2026-07-25 |
+| **U9** | **Check the Gemini API key's quota/billing — every call is 429ing (K12)** | **blocks the gate** |
 | U6 | After Sprint 5.5: read three real no-write runs, then flip `dryRunOnSchedule` | the gate |
 | U8 | *(optional)* Confirm the correct `teorth` / `erdosproblems` handles by hand | opportunistic |
 
@@ -103,7 +104,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 372 / 372 (`python -m pytest`) — no network, no API keys.
+**Passing:** 400 / 400 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
 was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
@@ -113,6 +114,37 @@ every one of 232 tests took the branch that has no judge in it.
 ---
 
 ## Completed since the re-plan
+
+### Sprint 5.5 — a real end-to-end run that writes nothing ✅ (and what it found)
+
+**R1 closed.** The scheduled dry run called TwitterAPI.io and stopped, so extraction, the
+judge and the merge guardrails had *never* run against real data — and those were exactly
+the stages the live-write gate was supposed to be evidence about. `run_plan` copies the store
+to a temporary directory, runs the **ordinary** live code into it, diffs the result, and then
+hashes every file to verify the repository did not move. It measures the promise rather than
+assuming it, and a leak fails the run with exit 2 whatever else it found.
+
+**The guardrail holds.** Three runs, repository untouched and curated registry safe in all
+three.
+
+**Then it did its job and found things no fixture could have.** In order:
+
+| run | finding |
+|---|---|
+| 1 | **32 of 50 extractions failed**, all HTTP 429, 121 calls for 50 observations. The client escalated its delay *within* one call's retries and reset for the next — TwitterAPI.io taught this exact lesson in Sprint 1.5 and it had never been carried over. Fixed: a 429 now slows every subsequent call, easing back gradually. |
+| 2 | **Cancelled at the 30-minute job timeout.** The pacing fix traded a burst of failures for a run that never finished, which reports nothing at all. Fixed: a wall-clock budget, a lower adaptive ceiling, a smaller call cap. |
+| 3 | Completed, no storm — 30 calls for 30 observations instead of 121 for 50. But **zero successful Gemini calls**: 10 observations × 3 retries, all 429, then the budget stopped it. |
+
+**K12 — that third result is not a pacing problem.** A 429 on every request regardless of
+delay is quota, not rate. Two changes so the system can tell the difference and say so: the
+client now reads the machine-readable `quotaId` from a 429 (structured metadata only — never
+the message body, which can echo request content) and treats a *PerDay* quota as terminal
+rather than retrying something waiting cannot fix; and a circuit breaker stops a stage after
+five consecutive failures with no success, because grinding through a budget while achieving
+nothing costs quota, delays the run, and reports as partial success when it is total failure.
+
+**This blocks the gate, and it is a key/billing question rather than a code one (U9).** Every
+other part of the chain is now demonstrated working on live data.
 
 ### Sprint 5.4 — Data contracts, cost and identity ✅
 

@@ -283,11 +283,26 @@ def run(
     started = time.monotonic()
     deferred_by_time = 0
 
+    # Circuit breaker. The third plan run spent its entire 720s budget without a
+    # single successful call: every request was rate-limited, and it kept going
+    # because nothing was watching the success rate. Grinding through a budget
+    # while achieving nothing costs quota, delays the run and — worst — reports
+    # as a partial success when it is a total failure.
+    breaker = int(ex.get("abortAfterConsecutiveFailures", 5))
+    consecutive = 0
+    aborted: str | None = None
+
     for i, obs in enumerate(todo):
         if time.monotonic() - started > budget:
             deferred_by_time = len(todo) - i
             break
+        if breaker and consecutive >= breaker and relevant == 0:
+            aborted = (f"stopped after {consecutive} consecutive failures with no "
+                       f"successful call — the stage is not working, not merely slow")
+            deferred_by_time = len(todo) - i
+            break
         updated, err = extract_one(model_client, obs, template, prompt_version, model_name)
+        consecutive = consecutive + 1 if err else 0
         by_id[updated["id"]] = updated
         if err:
             failed += 1
@@ -307,6 +322,8 @@ def run(
         "processed": len(todo),
         "deferredByCap": deferred,
         "deferredByTime": deferred_by_time,
+        "aborted": aborted,
+        "quotaReason": getattr(model_client, "last_quota_reason", None),
         "throttled": getattr(model_client, "throttled_count", 0),
         "elapsedSeconds": round(time.monotonic() - started, 1),
         "relevant": relevant,

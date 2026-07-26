@@ -146,12 +146,16 @@ def _print(report: dict) -> None:
     for name, stage in report["stages"].items():
         print(f"── {name}")
         for key in ("queriesRun", "tweetsFetched", "afterDedupe", "processed",
-                    "overflowDeferred", "considered", "extracted", "irrelevant",
-                    "failed", "apiCalls", "modelCalls", "judgeCalls",
+                    "overflowDeferred", "needingExtraction", "deferredByCap",
+                    "deferredByTime", "relevant", "irrelevant", "failed",
+                    "throttled", "elapsedSeconds", "quotaReason",
+                    "apiCalls", "modelCalls", "judgeCalls",
                     "judgeDeferred", "candidatesCreated", "candidatesUpdated",
                     "candidatesMerged", "reviewsCreated"):
             if key in stage:
                 print(f"     {key:<22} {stage[key]}")
+        if stage.get("aborted"):
+            print(f"     ::warning::ABORTED — {stage['aborted']}")
         if stage.get("decisions"):
             print(f"     decisions              {stage['decisions']}")
         if stage.get("reviewOpenByReason"):
