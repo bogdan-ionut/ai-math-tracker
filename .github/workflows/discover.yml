@@ -89,16 +89,32 @@ jobs:
           PY
           echo "resolved dry-run mode: $(grep dry= "$GITHUB_OUTPUT" | tail -1)"
 
-      - name: Ingest from X
-        if: steps.gate.outputs.run == 'true'
+      # R1. The dry path used to stop after ingestion, so extraction, matching,
+      # the judge and the merge guardrails had never once run against real data
+      # — and those were exactly the stages the live-write gate depended on.
+      # It now runs the whole chain through run_plan, which executes the
+      # ordinary live code into a temporary copy of the store and then verifies,
+      # by hashing, that the repository did not move.
+      - name: Plan run — full chain, real APIs, no writes
+        if: steps.gate.outputs.run == 'true' && steps.mode.outputs.dry == 'true'
         env:
           TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          if [ "${{ steps.mode.outputs.dry }}" = "true" ]; then
-            python -m scripts.automation.ingest --dry-run | tee ingest.json
-          else
-            python -m scripts.automation.ingest | tee ingest.json
-          fi
+          python -m scripts.automation.run_plan | tee plan_out.txt
+          {
+            echo "### Plan run — what a live run would have changed"
+            echo ""
+            echo '```'
+            cat plan_out.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ingest from X
+        if: steps.gate.outputs.run == 'true' && steps.mode.outputs.dry == 'false'
+        env:
+          TWITTERAPI_IO_KEY: ${{ secrets.TWITTERAPI_IO_KEY }}
+        run: python -m scripts.automation.ingest | tee ingest.json
 
       - name: Extract
         if: steps.gate.outputs.run == 'true' && steps.mode.outputs.dry == 'false'
@@ -180,6 +196,7 @@ jobs:
             ingest.json
             extract.json
             pipeline.json
+            plan_run.json
             data/automation/query_telemetry.json
           retention-days: 14
           if-no-files-found: ignore
