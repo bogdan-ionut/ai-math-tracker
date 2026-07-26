@@ -33,7 +33,7 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (400), and CI gates every merge |
+| Local test coverage | good (423), and CI gates every merge |
 | Retrieval correctness | sound — window server-side, cap shared round-robin, surplus carried |
 | Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | validated against the models on every read and write |
@@ -54,14 +54,14 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | ~~A4~~ | ~~Registry identifier collision erased~~ | ✅ | closed 5.2 |
 | ~~A5~~ | ~~Four review reasons declared but never emitted~~ | ✅ | closed 5.2 |
 | ~~R2~~ | ~~No server-side time window~~ — `since_time`/`until_time`; date form found broken | ✅ | closed 5.3 |
-| **R5** | Matching never searches the candidate store | 🟠 major | 6 |
+| ~~R5~~ | ~~Matching never searches the candidate store~~ | ✅ | closed 6 |
 | ~~R15+~~ | ~~`candidate_id` unstable under identifier acquisition~~ | ✅ | closed 5.4 |
 | ~~R3~~ | ~~`review` observations re-extracted daily~~ — plus retry backoff | ✅ | closed 5.4 |
 | ~~R4~~ | ~~Pydantic models do not validate persisted files~~ | ✅ | closed 5.4 |
 | ~~R1~~ | ~~Scheduled dry run skips extraction and pipeline~~ — now a full plan run | ✅ | closed 5.5 |
 | ~~R11~~ | ~~Unfair per-run cap; overflow counted, not queued~~ | ✅ | closed 5.3 |
 | ~~K10~~ | ~~Six of fourteen queries return zero~~ — TwitterAPI.io truncates at 512 chars | ✅ | closed 5.3 |
-| **R6** | Corroboration accepts a bare GitHub link | 🟠 major | 6 |
+| ~~R6~~ | ~~Corroboration accepts a bare GitHub link~~ — now tiered | ✅ | closed 6 |
 | ~~R7~~ | ~~No CI runs the tests~~ | ✅ | closed 5.1 |
 | ~~R15~~ | ~~Bot push has no rebase/retry~~ | ✅ | closed 5.1 |
 | ~~R12~~ | ~~`changes.py` unexpected check unreachable~~ | ✅ | closed 5.1 |
@@ -104,7 +104,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 400 / 400 (`python -m pytest`) — no network, no API keys.
+**Passing:** 423 / 423 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
 was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
@@ -114,6 +114,36 @@ every one of 232 tests took the branch that has no judge in it.
 ---
 
 ## Completed since the re-plan
+
+### Sprint 6 (part) — candidate matching and evidence tiers ✅
+
+Done while the Gemini quota is exhausted; neither change calls a model.
+
+**R5 — matching now searches the candidate store.** It only ever searched the curated
+registry, so the second post about a genuinely *new* problem could not see the candidate the
+first post created: it was decided `distinct_problem` and the two never converged. The
+roadmap has promised "Twitter and arXiv resolve to one candidate" since Sprint 0 and the
+architecture could not deliver it. Sprint 5.4 made `_upsert_candidate` converge on an exact
+identifier or exact name; this adds the fuzzy tier, because *"the unit distance problem"* and
+*"unit distance problem"* are the same problem and only the matcher knows that.
+
+Candidates are matched by **the same code** as registry records — two matchers would be two
+sets of bugs — and the registry is always searched first and wins unconditionally: a curated
+record is stronger evidence than a proposal we made ourselves.
+
+The subtle part is what a candidate match must *not* do. `problemRef` means "this is the
+curated problem in `data/results.json`", so a candidate id there would claim a link to
+published work that does not exist. A candidate match therefore sets `candidate_ref`, never
+`problemRef`, and the note tells the curator plainly that this **groups two unverified
+reports rather than confirming either**.
+
+**R6 / D37 — evidence is tiered rather than boolean.** "Corroborated" was one flag over six
+identifier kinds, which overstated what we knew: `published` (DOI, arXiv — third-party and
+independently locatable) is not the same as `referenced` (a GitHub or Lean link — somebody
+pointed at code, which may be a proof artifact or a README). The gate still admits everything
+it admitted before; what changed is what we are willing to *say*, and the review queue now
+records which tier rather than the word "corroborated". `minimumEvidenceTier` can raise the
+bar without a code change.
 
 ### Sprint 5.5 — a real end-to-end run that writes nothing ✅ (and what it found)
 

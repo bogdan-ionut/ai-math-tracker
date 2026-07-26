@@ -108,7 +108,12 @@ def run(dry_run: bool = False, judge_client: StructuredModel | None = None,
     by_id = {o["id"]: dict(o) for o in observations}
 
     for o in ready:
-        outcome = match_observation(o, registry, shortlist_size=shortlist_size)
+        # R5. Pass the live candidate list, so the second post about a new
+        # problem can see the candidate the first one created. `candidates` is
+        # rebound as the loop merges, so each observation matches against
+        # everything decided before it in this run as well.
+        outcome = match_observation(o, registry, shortlist_size=shortlist_size,
+                                    candidates=candidates)
 
         verdict = None
         judge_status = "not_needed"

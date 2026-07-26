@@ -92,6 +92,33 @@ def assert_registry_untouched(before: list[dict], after: list[dict]) -> None:
 
 CORROBORATING_KINDS = ("arxiv", "doi", "oeis", "erdos", "github", "lean")
 
+# D37. "Corroborated" was a boolean over these six kinds, which overstated what
+# we knew: a bare GitHub link is a *reference*, not corroboration. Someone
+# linking a repository has pointed somewhere; someone citing a DOI has pointed
+# at something a third party published and can be checked against.
+#
+# Tiers, strongest first. The gate still admits everything it admitted before —
+# this changes what we are willing to *say*, not what we collect.
+EVIDENCE_TIERS: dict[str, tuple[str, ...]] = {
+    # Third-party published and independently locatable.
+    "published": ("doi", "arxiv"),
+    # A curated problem registry: the claim is at least about a known problem.
+    "registered": ("erdos", "oeis"),
+    # Someone pointed at code. It may be a proof artifact or a README.
+    "referenced": ("github", "lean"),
+}
+
+TIER_ORDER = ("published", "registered", "referenced", "none")
+
+
+def evidence_tier(obs: dict) -> str:
+    """The strongest class of external reference this observation carries."""
+    ids = obs.get("externalIds") or {}
+    for tier in TIER_ORDER[:-1]:
+        if any(ids.get(k) for k in EVIDENCE_TIERS[tier]):
+            return tier
+    return "none"
+
 
 def has_corroboration(obs: dict) -> bool:
     """Is there anything outside the post itself that points at the claim?"""
@@ -106,9 +133,18 @@ def may_become_candidate(obs: dict, policy: dict | None = None) -> tuple[bool, s
     if not policy.get("requireCorroborationForCandidate", True):
         return True, "corroboration gate disabled in config"
 
-    if has_corroboration(obs):
+    tier = evidence_tier(obs)
+    if tier != "none":
         kinds = [k for k in CORROBORATING_KINDS if (obs.get("externalIds") or {}).get(k)]
-        return True, f"corroborated by {', '.join(kinds)}"
+        minimum = policy.get("minimumEvidenceTier", "referenced")
+        if TIER_ORDER.index(tier) > TIER_ORDER.index(minimum):
+            return False, (
+                f"{tier} evidence ({', '.join(kinds)}) is below the configured "
+                f"minimum of {minimum}"
+            )
+        # Say which tier, not just "corroborated" — a curator reading the queue
+        # needs to know whether this is a DOI or somebody's repository link.
+        return True, f"{tier} evidence: {', '.join(kinds)}"
 
     return False, (
         "no external identifier — a social post alone is not evidence, so this "

@@ -52,6 +52,11 @@ class Resolution:
 
     decision: str
     matched_id: Optional[str] = None
+    # R5. Set when matching found an existing *candidate* rather than a curated
+    # record. It must never be written to `problemRef`, which means "this is the
+    # curated problem in data/results.json" — pointing it at one of our own
+    # proposals would claim a link to published work that does not exist.
+    candidate_ref: Optional[str] = None
     deferred: bool = False
     forced_review: Optional[str] = None
     judge: Optional[dict] = None
@@ -93,6 +98,12 @@ def resolve(
     if outcome.conflict:
         return Resolution("insufficient_information", None,
                           forced_review="registry_conflict", notes=list(outcome.notes))
+
+    if outcome.matched_kind == "candidate" and outcome.matched_id:
+        # Group with the existing candidate; assert nothing about the registry.
+        return Resolution("same_problem_new_claim", None,
+                          candidate_ref=outcome.matched_id,
+                          notes=list(outcome.notes))
 
     if outcome.method == "identifier" and outcome.matched_id:
         return Resolution("same_problem_new_claim", outcome.matched_id)
@@ -276,7 +287,8 @@ def _absorb(primary: dict, other: dict) -> dict:
 
 
 def _upsert_candidate(
-    candidates: list[dict], obs: dict, matched_id: str | None, now: str
+    candidates: list[dict], obs: dict, matched_id: str | None, now: str,
+    join_id: str | None = None,
 ) -> tuple[list[dict], str, bool, bool, bool, int]:
     """Create or extend a candidate. Returns
     (candidates, candidate_id, created, claim_added, source_attached, merged).
@@ -295,6 +307,10 @@ def _upsert_candidate(
 
     by_id = {c["id"]: dict(c) for c in candidates}
     hits = _find_existing(candidates, name, ext)
+    # Matching already decided this belongs to a specific candidate; honour that
+    # rather than re-deriving it from the name, which is weaker evidence.
+    if join_id and join_id in by_id and join_id not in hits:
+        hits.insert(0, join_id)
     merged_count = 0
 
     if hits:
@@ -471,7 +487,8 @@ def apply_decision(
             return candidates, review_queue, report
 
         candidates, cid, created, claim_added, src, merged = _upsert_candidate(
-            candidates, obs, resolution.matched_id, now
+            candidates, obs, resolution.matched_id, now,
+            join_id=resolution.candidate_ref,
         )
         report.candidatesCreated += int(created)
         report.candidatesUpdated += int(not created)

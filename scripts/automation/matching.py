@@ -74,6 +74,14 @@ class MatchOutcome:
     conflicting_ids: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
+    # R5. Whether `matched_id` names a curated record or an existing candidate.
+    # Matching only ever searched the registry, so the second post about a
+    # genuinely *new* problem could not see the candidate the first one created
+    # — it was reported as `distinct_problem` and the two never converged. The
+    # distinction matters downstream: matching a curated record links to
+    # published work, matching a candidate merely groups two rumours.
+    matched_kind: str = "registry"
+
     def to_dict(self) -> dict:
         return {
             "method": self.method,
@@ -121,10 +129,58 @@ def _candidate_names(obs: dict) -> list[str]:
     return [n for n in names if n]
 
 
+def _as_records(candidates: list[dict]) -> list[dict]:
+    """Present candidates in the shape the matcher already understands.
+
+    Deliberately reusing the registry path rather than writing a second matcher:
+    a candidate that matched by one set of rules and a record that matched by
+    another would be a source of exactly the inconsistencies this stage exists
+    to prevent.
+    """
+    return [
+        {
+            "id": c["id"],
+            "title": c.get("canonicalName") or c["id"],
+            "aliases": list(c.get("aliases") or []),
+            "externalIds": dict(c.get("externalIds") or {}),
+        }
+        for c in candidates
+    ]
+
+
 def match_observation(
-    obs: dict, registry: list[dict] | None = None, shortlist_size: int = 5
+    obs: dict, registry: list[dict] | None = None, shortlist_size: int = 5,
+    candidates: list[dict] | None = None,
 ) -> MatchOutcome:
+    """Match against the curated registry first, then the candidate store.
+
+    Registry first and unconditionally: a curated record is stronger evidence
+    than a proposal we made ourselves, so a candidate must never win over one.
+    The candidate store is only consulted when the registry had nothing to say.
+    """
     registry = registry if registry is not None else load_registry()
+
+    if candidates:
+        primary = _match_against(obs, registry, shortlist_size)
+        if primary.method != "none" or primary.conflict:
+            return primary
+        secondary = _match_against(obs, _as_records(candidates), shortlist_size)
+        if secondary.method == "none":
+            # Keep the registry's notes: they explain what was searched.
+            return primary
+        secondary.matched_kind = "candidate"
+        secondary.notes = secondary.notes + [
+            "matched an existing candidate, not a curated record — this groups "
+            "two unverified reports, it does not confirm either"
+        ]
+        return secondary
+
+    return _match_against(obs, registry, shortlist_size)
+
+
+def _match_against(
+    obs: dict, registry: list[dict], shortlist_size: int = 5
+) -> MatchOutcome:
     obs_ids = _obs_ids(obs)
     notes: list[str] = []
 
