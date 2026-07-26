@@ -46,6 +46,8 @@ from scripts.automation.urls import canonicalize_url, expand_links, tweet_url  #
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = ROOT / "config"
 
+PAGE_SIZE = 20   # measured: the API returns 20 tweets per page
+
 
 # --------------------------------------------------------------------------
 # config
@@ -317,8 +319,19 @@ def run(
             telemetry.append({"queryId": bq.id, "tier": bq.tier,
                               "error": f"over {API_MAX_QUERY_CHARS} chars"})
             continue
+        # Pages hold 20. Tier 1 is configured for 40, so a single page could
+        # never reach the tier's own cap — the config asked for more than the
+        # fetch could ever deliver.
+        #
+        # The roadmap called for bisecting a saturated window (30h → 15h+15h).
+        # Pagination is the better instrument for the same goal: the cursor
+        # walks exactly the window we asked for, while bisecting re-runs the
+        # query and re-fetches the overlap. Bisecting would only be needed if
+        # pagination were itself truncated, and `saturated` below is what would
+        # tell us that.
+        pages = max(1, -(-bq.max_results // PAGE_SIZE))
         try:
-            tweets = client.search(query, query_type="Latest", max_pages=1)
+            tweets = client.search(query, query_type="Latest", max_pages=pages)
         except TwitterApiError as exc:
             # A partial failure must never wipe good data: record and continue.
             failures.append(f"{bq.id}: {exc}")
@@ -333,7 +346,11 @@ def run(
         telemetry.append({
             "queryId": bq.id, "tier": bq.tier,
             "returned": len(tweets), "keptInWindow": kept,
-            "cappedAt": bq.max_results,
+            "cappedAt": bq.max_results, "pagesRequested": pages,
+            # The window held at least as much as we were willing to take, so
+            # there may be more in it that we never saw. This is the signal
+            # that would justify splitting the window.
+            "saturated": len(tweets) >= bq.max_results,
         })
 
     # --- deduplicate (exact, by source-native id) -------------------------

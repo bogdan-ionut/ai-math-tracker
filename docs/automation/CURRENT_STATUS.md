@@ -4,9 +4,9 @@
 > scheduled workflow** — machine state lives in `data/automation/processing_state.json`, so
 > this file never accumulates meaningless daily diffs.
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-07-26
 **Phase:** executing the revised plan
-**Next sprint:** 5.3 remainder — server-side time windows and quota fairness
+**Next sprint:** 5.4 — Data contracts, cost and identity
 **Live writes:** 🔴 **disabled** (`dryRunOnSchedule: true`) — gate is Sprint 5.5
 
 ---
@@ -33,8 +33,8 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (309), and CI gates every merge |
-| Retrieval correctness | K10 fixed (22/23 queries return); `since_time` and quota fairness still open |
+| Local test coverage | good (334), and CI gates every merge |
+| Retrieval correctness | sound — window server-side, cap shared round-robin, surplus carried |
 | Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | JSON-parseable only, not model-validated |
 | Empirical calibration | **none** — the scheduled dry run has never exercised Gemini |
@@ -53,13 +53,13 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | ~~A3~~ | ~~Judge *unavailability* recorded as its *conclusion*~~ | ✅ | closed 5.2 |
 | ~~A4~~ | ~~Registry identifier collision erased~~ | ✅ | closed 5.2 |
 | ~~A5~~ | ~~Four review reasons declared but never emitted~~ | ✅ | closed 5.2 |
-| **R2** | No server-side `since:`/`until:` — lookback applied after the API picked 20 | 🔴 critical | 5.3 |
+| ~~R2~~ | ~~No server-side time window~~ — `since_time`/`until_time`; date form found broken | ✅ | closed 5.3 |
 | **R1** | Scheduled dry run skips extraction and pipeline entirely | 🔴 critical | 5.5 |
 | **R5** | Matching never searches the candidate store | 🟠 major | 6 |
 | **R15+** | `candidate_id` unstable under identifier acquisition → duplicates from one source | 🟠 major | 5.4 |
 | **R3** | `review` observations re-extracted daily (wasted Gemini) | 🟠 major | 5.4 |
 | **R4** | Pydantic models do not validate persisted files | 🟠 major | 5.4 |
-| **R11** | Unfair per-run cap; overflow counted, not queued | 🟠 major | 5.3 |
+| ~~R11~~ | ~~Unfair per-run cap; overflow counted, not queued~~ | ✅ | closed 5.3 |
 | ~~K10~~ | ~~Six of fourteen queries return zero~~ — TwitterAPI.io truncates at 512 chars | ✅ | closed 5.3 |
 | **R6** | Corroboration accepts a bare GitHub link | 🟠 major | 6 |
 | ~~R7~~ | ~~No CI runs the tests~~ | ✅ | closed 5.1 |
@@ -103,7 +103,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 309 / 309 (`python -m pytest`) — no network, no API keys.
+**Passing:** 334 / 334 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
 was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
@@ -114,12 +114,37 @@ every one of 232 tests took the branch that has no judge in it.
 
 ## Completed since the re-plan
 
-### Sprint 5.3 (part) — K10 solved ✅
+### Sprint 5.3 — Retrieval correctness ✅
 
-TwitterAPI.io silently truncates at **512 characters**. Long queries are now sharded into
-equivalent smaller ones rather than trimmed, and the old group-dropping truncation path is
-gone. **22 of 23 queries return results, against 8 of 14 before; 209 tweets per run against
-35.** Full account above. Remaining in this sprint: R2 and R11.
+**K10.** TwitterAPI.io silently truncates at **512 characters**. Long queries are sharded
+into equivalent smaller ones rather than trimmed, and the old group-dropping truncation path
+is gone. 8/14 queries returning results became 22/23; 35 tweets per run became 209.
+
+**R2.** The lookback now goes to the server as `since_time`/`until_time`. It used to run
+*after* the API had picked its 20 newest all-time matches, so a busy query could hand back 20
+stale tweets and contribute nothing. The date form turned out to be applied **wrongly**, not
+merely unverified — it returned tweets a day outside the window it was given — so only the
+unix form is used. Its 44 characters are reserved out of the 512-char budget, because
+otherwise fixing R2 would have re-opened K10.
+
+**R11.** `deduped[:cap]` was a standing preference for whichever families were built first,
+not a cap. Selection is round-robin, and the surplus is carried in `ingest_backlog.json`
+rather than counted and dropped — deduplicated against both the fresh fetch and the
+observation store so the overlapping lookback cannot make it grow without bound.
+
+| first live run with all three | |
+|---|---|
+| queries | 28, zero failures |
+| tweets fetched | 205 → 157 after dedupe |
+| processed / **carried** | 50 / **107** (previously discarded) |
+| fetched-then-discarded | **0** — `returned == kept` for every query |
+
+Pagination replaced the roadmap's window bisection: the cursor walks exactly the window we
+asked for, where bisection re-runs the query and re-fetches the overlap. It also fixed a
+quieter mismatch — pages hold 20 and `max_pages` was 1, while tier 1 is configured for 40, so
+the config had been asking for twice what the fetch could deliver. New `saturated` telemetry
+flags a window that may hold more than we took; that is the signal that would justify
+bisection, and it has not fired.
 
 ### Sprint 5.2 — Make the judge actually decide ✅
 

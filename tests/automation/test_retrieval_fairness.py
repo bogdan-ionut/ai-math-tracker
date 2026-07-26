@@ -179,3 +179,23 @@ class TestTheBacklogDrains:
         existing = [{"sourceNativeId": f"a-{i}"} for i in range(3)]
         pending, used = _combine_with_backlog(carried, [], existing)
         assert pending == [] and used == 0
+
+
+class TestTheTierCapIsReachable:
+    """Pages hold 20; tier 1 asks for 40. One page could never satisfy it."""
+
+    def test_pages_are_requested_to_cover_the_tier_cap(self):
+        from math import ceil
+
+        from scripts.automation.ingest import PAGE_SIZE
+        for q in build_queries():
+            pages = max(1, ceil(q.max_results / PAGE_SIZE))
+            assert pages * PAGE_SIZE >= q.max_results, (
+                f"{q.id} caps at {q.max_results} but only {pages} page(s) are fetched"
+            )
+
+    def test_a_tier_one_query_needs_more_than_one_page(self):
+        tier1 = [q for q in build_queries() if q.tier == 1]
+        assert tier1 and max(q.max_results for q in tier1) > 20, (
+            "if this stops being true the pagination above is dead weight"
+        )

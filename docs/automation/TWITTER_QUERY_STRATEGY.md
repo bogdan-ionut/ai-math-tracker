@@ -23,9 +23,10 @@ API (`.github/workflows/probe-twitter-syntax.yml`, run **30155078770**).
 | `-filter:retweets` | ✅ supported | 0/20 were retweets |
 | `lang:en` | ✅ supported | 20 results |
 | `url:arxiv.org` | ✅ supported | 20 results |
-| `since:YYYY-MM-DD` | ✅ supported | 20 results |
+| `since:YYYY-MM-DD` | ❌ **applied wrongly** | asked for 07-19…07-21, got 20 tweets all dated 07-22 — see §5c |
+| `since_time:`/`until_time:` (unix) | ✅ supported | past window returned only in-window dates; a future window returned nothing |
 | Unicode (`Erdős`) | ✅ supported | 20 results — no ASCII folding needed |
-| 788-character query | accepted, **0 results** | see §5b — I originally read this as "fine"; it was a warning |
+| ≥ 513-character query | accepted, **0 results** | see §5b — the silent limit |
 
 Pagination returns **20 tweets per page**; `queryType` is `Latest` or `Top`.
 
@@ -245,6 +246,64 @@ added precisely because both `disputed` records here are dispute signals, return
 
 Measured corroboration before the fix: **3/20 and 4/35 — 11–15%**. The external-reference
 gate is doing most of the filtering, exactly as designed.
+
+## 5c. R2 — the window has to be the server's job
+
+Until now the lookback was applied **after** the API had already chosen its 20 newest
+all-time matches. A query with more than 20 matches ever could therefore hand back 20 stale
+tweets and contribute nothing, while newer matching posts existed and were never requested.
+Retrieval was capped at "20 per query, ever" and then filtered down from there.
+
+`since_time:<unix> until_time:<unix>` is now appended at fetch time.
+
+**The date form is not used.** The syntax probe had recorded `since:YYYY-MM-DD` as supported
+because it returned 20 results — but so does an operator the backend ignores, and on this API
+silently doing nothing is the characteristic failure. Re-probed properly, `since:`/`until:`
+turns out not to be ignored but *wrong*: a request for 2026-07-19…07-21 returned twenty
+tweets **all dated 07-22**, zero inside the window. The unix form was exact on the same
+check — in-window dates for a past window, nothing at all for a future one — and second
+precision is what a 30-hour lookback needs anyway.
+
+The two operators cost **44 characters**, out of the same 512-character budget as everything
+else. Sharding therefore builds against `MAX_QUERY_CHARS - TIME_WINDOW_CHARS`; without that
+reserve, appending the window would have pushed queries back over the limit and re-opened
+K10 while fixing R2.
+
+**Measured after the change:** every query returned exactly what it kept — `returned == kept`
+for all 28, against a previous pattern of fetching 20 and discarding most of them.
+
+## 5c-bis. Pagination, chosen over window bisection
+
+The roadmap called for splitting a saturated window (30h → 15h + 15h, recursively) when a
+query fills a page. Pagination reaches the same goal with a better instrument: the cursor
+walks exactly the window we asked for, while bisection re-runs the query and re-fetches the
+overlap between halves.
+
+It also fixed a quieter mismatch. Pages hold 20 results and `max_pages` was 1, while tier 1
+is configured for `maxResultsPerRun: 40` — the config asked for twice what the fetch could
+ever return, and nothing said so. Pages are now requested to cover each tier's own cap.
+
+Telemetry gains `saturated`: the window held at least as much as we were willing to take, so
+there may be more in it we never saw. That is the signal that would justify bisection, and
+until it fires there is nothing to justify.
+
+## 5d. R11 — the cap was a preference, not a cap
+
+`deduped[:maxObservationsPerRun]` took the first N in query order. Whichever families were
+built first always got in; the ones built last were dropped whenever a day was busy, and the
+only trace was a single `overflowDeferred` count that never said *which*.
+
+Selection is now round-robin across queries — a cap of 50 across 28 queries costs each of
+them the same — and the surplus is carried in `data/automation/ingest_backlog.json` instead
+of being discarded. Those records are already fetched and already paid for.
+
+The backlog is deduplicated against both the fresh fetch and the observation store, because
+the lookback window overlaps deliberately: without that, each run would refill the backlog
+with copies of what it just processed and it would grow without bound. Verified to drain —
+25 processed / 15 carried, then 15 consumed / 0 remaining, then a no-op.
+
+**First live run with both:** 28 queries, 205 tweets, 157 after dedupe, 50 processed and
+**107 carried** — a surplus that would previously have been silently thrown away.
 
 ## 6. Telemetry
 

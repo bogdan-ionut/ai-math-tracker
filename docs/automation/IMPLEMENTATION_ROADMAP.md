@@ -17,8 +17,8 @@ further defects in the judge stage.
 | 5 | Scheduled GitHub Actions workflow | **completed** |
 | **5.1** | **Truthfulness and CI** | **completed** |
 | **5.2** | **Make the judge actually decide** | **completed** |
-| **5.3** | **Retrieval correctness** | **planned — next** |
-| **5.4** | **Data contracts, cost and identity** | planned |
+| **5.3** | **Retrieval correctness** | **completed** |
+| **5.4** | **Data contracts, cost and identity** | **planned — next** |
 | **5.5** | **Real no-write end-to-end → gate to live writes** | planned |
 | 6 | Multi-source + candidate entity resolution | planned |
 | 6.5 | Curator workflow | planned |
@@ -120,7 +120,7 @@ alias or lexical match while explicit identifiers disagree with another record.
 
 ---
 
-## Sprint 5.3 — Retrieval correctness · `planned — next`
+## Sprint 5.3 — Retrieval correctness · `completed`
 
 **Objective.** Retrieve what we believe we retrieve. Currently a busy query silently loses
 matches, and six of fourteen queries return nothing for reasons unknown.
