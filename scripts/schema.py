@@ -144,4 +144,18 @@ class Summary(BaseModel):
     by_impact: dict[str, int] = Field(alias="byImpact")
     landmarks: list[str]  # ids of the impact-5 results
 
+    # F1. Two figures the site was silent about while asserting the opposite.
+    #
+    # `source_coverage` exists because 27 of 40 records carry no source URL, and
+    # the concentration is worst in `audited` — the only tier allowed to be
+    # green. build_data.py has warned about this on every run since it was
+    # written and nothing downstream ever saw the number.
+    #
+    # `audit_dating` exists because every audited record has auditedAt equal to
+    # claimedAt, while the methodology text told readers the two were kept
+    # apart. A figure the page has to render is harder to keep quiet about than
+    # a warning in a build log.
+    source_coverage: dict = Field(alias="sourceCoverage")
+    audit_dating: dict = Field(alias="auditDating")
+
     model_config = {"populate_by_name": True}

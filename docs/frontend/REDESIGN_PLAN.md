@@ -186,7 +186,7 @@ dataset full of gaps — into its subject matter.
 Ordered so each ships something usable alone, and nothing waits on later work.
 **F1–F3 need no new backend data.**
 
-### F1 — Stop asserting what is not true
+### F1 — Stop asserting what is not true · `completed 2026-07-26`
 **Objective.** Remove the two false claims before building anything on top of them.
 **Files.** `MethodologyFooter.tsx` · `build_data.py` · `Masthead.tsx` · `data/results.json` (curation)
 **Deliverables.** Correct the `auditedAt` sentence to describe what the data actually shows.
@@ -196,6 +196,24 @@ it — a null is honest, a copied date is not.
 **Acceptance.** No sentence on the page is contradicted by `data/results.json`. A test asserts
 the source-coverage figure matches the registry.
 **Risk.** None technical. It makes the site look worse, which is the point.
+
+**Delivered.** `sourceCoverage` and `auditDating` are computed in `build_data.py` and rendered
+from, rather than written into, the copy — a corrected sentence rots the moment the data moves,
+so the claim and the evidence now cannot drift apart. `splitIsInformative` flips the instant one
+audit is dated after its claim, and the paragraph disappears with it.
+
+The masthead carries a fourth figure at the same size as the other three: **12 · of 17 audited,
+unsourced**, in muted grey. `accent` is green and green means audited, so a deficiency may not
+borrow it. A new "What this dataset does not establish" block states both gaps in live numbers.
+
+**One decision deliberately left to the curator.** `auditedAt` could not simply be nulled:
+`schema.py:109` requires it whenever `status == "audited"`, so nulling would fail validation for
+all 17 records. More to the point, `data/results.json` is the curated registry this whole project
+exists to protect, and rewriting 17 editorial dates is not an engineering call. The page now
+states the situation accurately either way. **See K13.**
+
+14 tests. The load-bearing ones assert no figure is hardcoded in the components and that the
+deficiency is never rendered green.
 
 ### F2 — The evidence bar and the batch disclosure
 **Objective.** Reframe the top of the page from volume to evidence.

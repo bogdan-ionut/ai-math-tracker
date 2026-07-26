@@ -1,20 +1,24 @@
 import { Moon, Sun } from "lucide-react";
 import type { Metrics } from "@/lib/filters";
+import type { Summary } from "@/types/result";
 import type { Theme } from "@/hooks/useTheme";
 
 export function Masthead({
   m,
+  summary,
   rangeEnd,
   generatedAt,
   theme,
   onToggleTheme: toggle,
 }: {
   m: Metrics;
+  summary?: Summary | null;
   rangeEnd?: string;
   generatedAt?: string;
   theme: Theme;
   onToggleTheme: () => void;
 }) {
+  const cover = summary?.sourceCoverage;
 
   return (
     <header className="pb-8 pt-2">
@@ -43,10 +47,20 @@ export function Masthead({
           <span className="text-ink"> Most did not. A few changed everything.</span>
         </p>
 
-        <dl className="flex flex-none gap-8">
+        {/* F1. The caveat is set at the same size as the boast, deliberately.
+            A limitation in smaller type than the figure it qualifies is a
+            limitation the page does not really want read. */}
+        <dl className="flex flex-none flex-wrap gap-8">
           <Stat value={m.total} label="claimed" />
           <Stat value={m.byStatus.audited} label="audited" accent />
           <Stat value={m.byImpact[5] ?? 0} label="field-shaping" />
+          {cover && cover.auditedWithoutSource > 0 && (
+            <Stat
+              value={cover.auditedWithoutSource}
+              label={`of ${cover.auditedTotal} audited, unsourced`}
+              muted
+            />
+          )}
         </dl>
       </div>
 
@@ -67,19 +81,20 @@ function Stat({
   value,
   label,
   accent = false,
+  muted = false,
 }: {
   value: number;
   label: string;
   accent?: boolean;
+  muted?: boolean;
 }) {
+  // `accent` is green, and green means audited. Nothing else may use it — the
+  // unsourced count in particular is a deficiency, not an achievement.
+  const tone = accent ? "text-good" : muted ? "text-muted" : "text-ink";
   return (
     <div>
-      <dd
-        className={`display text-[44px] leading-none ${accent ? "text-good" : "text-ink"}`}
-      >
-        {value}
-      </dd>
-      <dt className="eyebrow mt-1.5">{label}</dt>
+      <dd className={`display text-[44px] leading-none ${tone}`}>{value}</dd>
+      <dt className="eyebrow mt-1.5 max-w-[14ch]">{label}</dt>
     </div>
   );
 }

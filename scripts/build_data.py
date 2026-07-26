@@ -85,6 +85,48 @@ def model_families(records: list[MathematicalResult]) -> int:
     return len(fams)
 
 
+def source_coverage(records: list[MathematicalResult]) -> dict:
+    """How much of the registry actually points at anything.
+
+    Reported per status, and in *records* rather than problems, because a batch
+    of 44 problems carries one source URL or none — counting it as 44 sourced
+    problems would restate the very overstatement this figure exists to expose.
+    """
+    out: dict[str, dict[str, int]] = {}
+    for r in records:
+        bucket = out.setdefault(r.status, {"withSource": 0, "withoutSource": 0})
+        bucket["withSource" if r.sources else "withoutSource"] += 1
+    totals = {
+        "recordsWithSource": sum(1 for r in records if r.sources),
+        "recordsWithoutSource": sum(1 for r in records if not r.sources),
+        "byStatus": out,
+    }
+    totals["auditedWithoutSource"] = out.get("audited", {}).get("withoutSource", 0)
+    totals["auditedTotal"] = sum(out.get("audited", {}).values())
+    return totals
+
+
+def audit_dating(records: list[MathematicalResult]) -> dict:
+    """Whether `auditedAt` is telling us anything `claimedAt` did not.
+
+    The split between the two is described throughout this project as what keeps
+    it honest — an announcement is not a confirmation. If every audit is dated
+    the day of the claim, that sentence is decoration, and the site should be
+    the first to say so rather than the last.
+    """
+    audited = [r for r in records if r.status == "audited"]
+    same = [r for r in audited if r.audited_at and r.audited_at == r.claimed_at]
+    lagged = [r for r in audited if r.audited_at and r.audited_at != r.claimed_at]
+    return {
+        "auditedRecords": len(audited),
+        "sameDayAsClaim": len(same),
+        "laterThanClaim": len(lagged),
+        "missingAuditDate": sum(1 for r in audited if not r.audited_at),
+        # The one number that decides whether the methodology text is true.
+        "splitIsInformative": bool(lagged),
+    }
+
+
 def build_summary(records: list[MathematicalResult]) -> Summary:
     # Disputed results are recorded but never counted in the headline total.
     total = sum(r.count for r in records if r.status != "disputed")
@@ -135,6 +177,8 @@ def build_summary(records: list[MathematicalResult]) -> Summary:
         assessed=sum(1 for r in records if r.impact is not None),
         byImpact=dict(by_impact),
         landmarks=landmarks,
+        source_coverage=source_coverage(records),
+        audit_dating=audit_dating(records),
     )
 
 

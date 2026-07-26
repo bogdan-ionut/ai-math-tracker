@@ -58,6 +58,7 @@ export function App() {
           <>
             <Masthead
               m={metrics}
+              summary={summary}
               rangeEnd={summary?.rangeEnd}
               generatedAt={summary?.generatedAt}
               theme={theme}
@@ -94,7 +95,7 @@ export function App() {
               </div>
 
               <Ledger rows={filtered} onSelect={setSelected} />
-              <MethodologyFooter />
+              <MethodologyFooter summary={summary} />
 
               <SignalsPanel feed={signals} />
             </div>

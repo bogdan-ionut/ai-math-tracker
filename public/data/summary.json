@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-26T17:35:51+00:00",
+  "generatedAt": "2026-07-26T17:43:37+00:00",
   "rangeStart": "2026-01-05",
   "rangeEnd": "2026-07-24",
   "total": 121,
@@ -46,5 +46,36 @@
     "erdos-90",
     "cycle-double-cover",
     "jacobian-conjecture-1939"
-  ]
+  ],
+  "sourceCoverage": {
+    "recordsWithSource": 13,
+    "recordsWithoutSource": 27,
+    "byStatus": {
+      "reported": {
+        "withSource": 2,
+        "withoutSource": 10
+      },
+      "audited": {
+        "withSource": 5,
+        "withoutSource": 12
+      },
+      "provisional": {
+        "withSource": 5,
+        "withoutSource": 4
+      },
+      "disputed": {
+        "withSource": 1,
+        "withoutSource": 1
+      }
+    },
+    "auditedWithoutSource": 12,
+    "auditedTotal": 17
+  },
+  "auditDating": {
+    "auditedRecords": 17,
+    "sameDayAsClaim": 17,
+    "laterThanClaim": 0,
+    "missingAuditDate": 0,
+    "splitIsInformative": false
+  }
 }

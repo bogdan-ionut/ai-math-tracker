@@ -61,4 +61,24 @@ export interface Summary {
   assessed: number;
   byImpact: Record<string, number>;
   landmarks: string[];
+
+  /** F1. How much of the registry points at anything. Counted in *records*: a
+   *  44-problem batch carries one source URL or none. */
+  sourceCoverage: {
+    recordsWithSource: number;
+    recordsWithoutSource: number;
+    auditedWithoutSource: number;
+    auditedTotal: number;
+    byStatus: Record<string, { withSource: number; withoutSource: number }>;
+  };
+
+  /** F1. Whether `auditedAt` says anything `claimedAt` did not. When
+   *  `splitIsInformative` is false, the methodology text must not claim it does. */
+  auditDating: {
+    auditedRecords: number;
+    sameDayAsClaim: number;
+    laterThanClaim: number;
+    missingAuditDate: number;
+    splitIsInformative: boolean;
+  };
 }

@@ -37,7 +37,7 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (502), and CI gates every merge |
+| Local test coverage | good (516), and CI gates every merge |
 | Retrieval correctness | sound — window server-side, cap shared round-robin, surplus carried |
 | Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | validated against the models on every read and write |
@@ -74,6 +74,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | ~~R8~~ | ~~No curator workflow~~ — `curate` CLI, promote → draft PR | ✅ | closed 6.5 |
 | ~~K11~~ | ~~TwitterAPI.io out of credit~~ | ✅ | topped up 2026-07-25 |
 | **K6** | Only 13/40 curated records carry a source URL | 🟡 minor | human backfill |
+| **K13** | `auditedAt` equals `claimedAt` on all 17 audited records — the split the project calls its spine carries no information | 🟠 major | curator decision |
 | **K8** | `teorth` / `erdosproblems` handles unconfirmed | 🟡 minor | opportunistic |
 | **K9** | Gold set fitted to known wordings — 100% recall is a floor, not proof | ℹ️ noted | ongoing |
 
@@ -108,7 +109,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 502 / 502 (`python -m pytest`) — no network, no API keys.
+**Passing:** 516 / 516 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
 was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
