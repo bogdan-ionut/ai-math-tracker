@@ -122,6 +122,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python -m scripts.automation.extraction | tee extract.json
 
+      - name: Verify claimed references
+        if: steps.gate.outputs.run == 'true' && steps.mode.outputs.dry == 'false'
+        run: python -m scripts.automation.verify_refs | tee verify.json
+
       - name: Match, judge and merge
         if: steps.gate.outputs.run == 'true' && steps.mode.outputs.dry == 'false'
         env:
@@ -196,6 +200,7 @@ jobs:
             ingest.json
             extract.json
             pipeline.json
+            verify.json
             plan_run.json
             data/automation/query_telemetry.json
           retention-days: 14

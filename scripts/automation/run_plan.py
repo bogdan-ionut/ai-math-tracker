@@ -110,13 +110,16 @@ def run(limit: int | None = None) -> dict:
         store.RAW_DIR = sandbox / "raw" / "twitter"
 
         try:
-            from scripts.automation import extraction, ingest, pipeline
+            from scripts.automation import extraction, ingest, pipeline, verify_refs
 
             stages["ingest"] = ingest.run(limit=limit)
             if not stages["ingest"].get("ok"):
                 return _finish(before, sandbox, stages, aborted="ingest failed")
 
             stages["extract"] = extraction.run()
+            # Before matching: the merge engine applies the corroboration gate,
+            # so a tier that turns out not to be earned has to be known first.
+            stages["verify"] = verify_refs.run()
             stages["pipeline"] = pipeline.run()
         finally:
             store.DATA_DIR, store.RAW_DIR = real_data_dir, real_raw_dir
@@ -149,11 +152,16 @@ def _print(report: dict) -> None:
                     "overflowDeferred", "needingExtraction", "deferredByCap",
                     "deferredByTime", "relevant", "irrelevant", "failed",
                     "throttled", "elapsedSeconds", "quotaReason",
+                    "needingCheck", "checked", "referencesResolved",
+                    "referencesUnresolved", "referencesUnchecked",
                     "apiCalls", "modelCalls", "judgeCalls",
                     "judgeDeferred", "candidatesCreated", "candidatesUpdated",
                     "candidatesMerged", "reviewsCreated"):
             if key in stage:
                 print(f"     {key:<22} {stage[key]}")
+        for key in ("tierDowngrades", "lowAffinityResolved"):
+            for line in stage.get(key) or []:
+                print(f"     {key}: {line}")
         if stage.get("aborted"):
             print(f"     ::warning::ABORTED — {stage['aborted']}")
         if stage.get("decisions"):

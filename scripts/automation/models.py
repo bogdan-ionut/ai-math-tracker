@@ -105,6 +105,12 @@ class Observation(BaseModel):
     failureType: Optional[Literal["transient", "permanent"]] = None
 
     # Written by the pipeline stage — likewise previously undeclared.
+    # Sprint 6. What resolving the observation's claimed external references
+    # actually found: {"arxiv": [{"id", "status", "checkedAt", "paper"}]}.
+    # `status` is resolved | unresolved | unchecked — the third distinct from
+    # the second on purpose, because not knowing is not a finding.
+    references: dict[str, list[dict]] = Field(default_factory=dict)
+
     matchMethod: Optional[str] = None
     decision: Optional[str] = None
 

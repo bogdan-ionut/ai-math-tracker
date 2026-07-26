@@ -33,7 +33,7 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (472), and CI gates every merge |
+| Local test coverage | good (502), and CI gates every merge |
 | Retrieval correctness | sound — window server-side, cap shared round-robin, surplus carried |
 | Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | validated against the models on every read and write |
@@ -104,7 +104,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 472 / 472 (`python -m pytest`) — no network, no API keys.
+**Passing:** 502 / 502 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
 was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
@@ -114,6 +114,34 @@ every one of 232 tests took the branch that has no judge in it.
 ---
 
 ## Completed since the re-plan
+
+### Sprint 6 (rest) — resolve claimed references against arXiv ✅
+
+No API key: arXiv's export API is public. Its courtesy limit of one request per three seconds
+is honoured rather than discovered, which is the lesson K12 charged us for.
+
+**The gap.** An observation earned `published` — the strongest tier we award — because its
+text contained something shaped like an arXiv id. Nobody checked the paper existed. A
+mis-transcription, a hallucinated citation and a genuine preprint were indistinguishable and
+counted the same. That is the old boolean `has_corroboration` failure one level down:
+treating the *presence* of a reference as the *substance* of one.
+
+**Three outcomes, and the third is the point.** `resolved` stores title, date and authors so
+a curator has something to judge with. `unresolved` means arXiv does not know that id — and
+it can no longer buy `published`. `unchecked` means we could not ask, and is deliberately
+distinct: not knowing is not a finding. This project has had to relearn that twice already —
+once when judge unavailability was recorded as the judge's conclusion (A3), once when a
+Gemini quota looked like a pacing problem (K12).
+
+**What resolution does not prove.** A live check found `2607.16401` resolving perfectly — to
+*"Apple-π: Benchmarking Thinking with Video"*, a real paper with nothing to do with the Erdős
+problem it was cited for. Existence and relevance are different questions and only the first
+can be answered mechanically. So a `titleAffinity` score is recorded and surfaced to the
+curator and **never acted on**: nothing is downgraded or discarded because a score is low.
+
+Verified end to end against the live API: `1706.03762` resolved, `2607.16401` resolved but
+flagged at affinity 0.29, `2601.99999` unresolved and correctly downgraded `published → none`.
+Nothing is deleted — the claim that someone posted that id stays true and auditable.
 
 ### Sprint 7 — automated signals on the site ✅
 
