@@ -13,6 +13,7 @@ Contract:
 """
 from __future__ import annotations
 
+import time
 from datetime import datetime, timedelta, timezone
 
 import argparse
@@ -272,7 +273,20 @@ def run(
     relevant = failed = 0
     errors: list[str] = []
 
-    for obs in todo:
+    # A wall-clock budget, not just a call cap. Adaptive pacing slows the client
+    # down under rate limiting — which is correct — but slowing down without
+    # bounding the run trades a burst of failures for a run that never finishes:
+    # 50 observations at the maximum interval outlasts the workflow's own
+    # timeout. This pipeline is incremental by design, so stopping early is
+    # cheap: whatever is left is still `new` and the next run takes it.
+    budget = float(ex.get("maxWallClockSeconds", 900))
+    started = time.monotonic()
+    deferred_by_time = 0
+
+    for i, obs in enumerate(todo):
+        if time.monotonic() - started > budget:
+            deferred_by_time = len(todo) - i
+            break
         updated, err = extract_one(model_client, obs, template, prompt_version, model_name)
         by_id[updated["id"]] = updated
         if err:
@@ -292,8 +306,11 @@ def run(
         "needingExtraction": len(pending),
         "processed": len(todo),
         "deferredByCap": deferred,
+        "deferredByTime": deferred_by_time,
+        "throttled": getattr(model_client, "throttled_count", 0),
+        "elapsedSeconds": round(time.monotonic() - started, 1),
         "relevant": relevant,
-        "irrelevant": len(todo) - relevant - failed,
+        "irrelevant": len(todo) - deferred_by_time - relevant - failed,
         "failed": failed,
         "errors": errors[:10],
         "apiCalls": getattr(model_client, "call_count", 0),

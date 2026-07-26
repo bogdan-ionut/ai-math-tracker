@@ -45,7 +45,7 @@ class GeminiClient:
         max_retries: int = 3,
         backoff: float = 2.0,
         min_interval: float = 4.0,
-        max_interval: float = 60.0,
+        max_interval: float = 20.0,
         base_url: str = BASE_URL,
     ) -> None:
         key = api_key if api_key is not None else os.environ.get("GEMINI_API_KEY", "")
