@@ -62,8 +62,12 @@ class TestBuilder:
         assert all("-filter:retweets" in q.query for q in queries)
 
     def test_unicode_terms_survive_building(self, queries):
-        registry = next(q for q in queries if q.id == "problem-registries")
-        assert "Erdős" in registry.query and "Erdos" in registry.query
+        shards = [q for q in queries if q.family == "problem-registries"]
+        assert shards
+        # The registry names live in the group that is never split, so every
+        # shard must carry them — losing them from one would silently narrow it.
+        for s in shards:
+            assert "Erdős" in s.query and "Erdos" in s.query
 
     def test_tiers_carry_caps(self, queries):
         for q in queries:

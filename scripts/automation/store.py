@@ -75,6 +75,17 @@ def state_path() -> Path:
     return DATA_DIR / "processing_state.json"
 
 
+def backlog_path() -> Path:
+    """Fetched-but-not-yet-processed tweets, carried to the next run.
+
+    A run caps how many observations it creates. Everything above the cap used
+    to be counted and dropped, so a busy day silently lost the surplus and the
+    only trace was a number in the summary. These records are already paid for;
+    parking them here costs nothing and the next run consumes them first.
+    """
+    return DATA_DIR / "ingest_backlog.json"
+
+
 def raw_path(day: str) -> Path:
     return RAW_DIR / f"{day}.json"
 

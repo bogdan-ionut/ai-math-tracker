@@ -35,7 +35,12 @@ from scripts.automation.twitter import (  # noqa: E402
     TwitterApiClient,
     TwitterApiError,
 )
-from scripts.automation.query_builder import BuiltQuery, build_queries  # noqa: E402
+from scripts.automation.query_builder import (  # noqa: E402
+    API_MAX_QUERY_CHARS,
+    BuiltQuery,
+    build_queries,
+    with_time_window,
+)
 from scripts.automation.urls import canonicalize_url, expand_links, tweet_url  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -185,6 +190,78 @@ def merge_observations(existing: list[dict], fresh: list[Observation], now: str)
 # main
 # --------------------------------------------------------------------------
 
+def select_fairly(records: list[RawTweet], cap: int) -> tuple[list[RawTweet], list[RawTweet]]:
+    """Take up to `cap` records, spreading them evenly across queries.
+
+    Straight truncation of a query-ordered list is not a cap, it is a silent
+    preference for whichever families happen to be built first. On a busy day
+    the last families never got in at all — and because the surplus was only
+    ever reported as a count, nothing showed which ones lost.
+
+    Round-robin instead: one record from each query in turn, so a cap of 50
+    across 28 queries costs every query the same. Order within a query is
+    preserved, so the newest tweets survive a partial take. Everything not
+    taken is returned as backlog rather than dropped.
+    """
+    by_query: dict[str, list[RawTweet]] = {}
+    for rec in records:
+        by_query.setdefault(rec.matchedQueryId, []).append(rec)
+
+    taken: list[RawTweet] = []
+    while len(taken) < cap and any(by_query.values()):
+        for queue in by_query.values():
+            if not queue:
+                continue
+            taken.append(queue.pop(0))
+            if len(taken) >= cap:
+                break
+
+    deferred = [rec for queue in by_query.values() for rec in queue]
+    return taken, deferred
+
+
+def _combine_with_backlog(
+    backlog: list[RawTweet], fresh: list[RawTweet], existing: list[dict]
+) -> tuple[list[RawTweet], int]:
+    """Merge carried-over records with this run's fetch.
+
+    Two things have to be dropped, or the backlog grows without bound:
+
+      * anything the overlapping lookback window re-fetched, which is most of
+        it — the carried copy and the fresh copy are the same tweet;
+      * anything already turned into an observation by an earlier run, which is
+        what the backlog exists to make happen.
+
+    Backlog first, so the oldest waiting records are the ones that get in.
+    """
+    done = {o.get("sourceNativeId") for o in existing}
+    carried = {r.tweetId for r in backlog}
+    seen: set[str] = set()
+    out: list[RawTweet] = []
+    for rec in [*backlog, *fresh]:
+        if rec.tweetId in done or rec.tweetId in seen:
+            continue
+        seen.add(rec.tweetId)
+        out.append(rec)
+    return out, len(seen & carried)
+
+
+def _load_backlog() -> list[RawTweet]:
+    """Records carried from a previous run. Corruption is not fatal here — the
+    backlog is an optimisation, and losing it costs API calls, not data."""
+    try:
+        rows = store.read_json(store.backlog_path(), [])
+    except store.CorruptStoreError:
+        return []
+    out: list[RawTweet] = []
+    for row in rows:
+        try:
+            out.append(RawTweet.model_validate(row))
+        except ValidationError:
+            continue
+    return out
+
+
 def run(
     dry_run: bool = False,
     fixtures: Path | None = None,
@@ -221,9 +298,27 @@ def run(
     failures: list[str] = []
     telemetry: list[dict] = []
 
+    # R2. The window goes to the server. Applying it here only, as before, meant
+    # the API picked its 20 newest matches over all time and *then* we discarded
+    # the ones outside the window — so a query with more than 20 all-time
+    # matches could return 20 stale tweets and yield nothing, while newer
+    # matching posts existed and were never asked for. `within_lookback` below
+    # stays as a safety net for undated records and clock skew.
+    window_start = now_dt - timedelta(hours=lookback)
+    windowed = not isinstance(client, FixtureSearchClient)
+
     for bq in queries:
+        query = (with_time_window(bq.query, window_start, now_dt)
+                 if windowed else bq.query)
+        if len(query) > API_MAX_QUERY_CHARS:
+            # Would trip the silent-zero limit. Never send it: a query that
+            # returns nothing looks exactly like a quiet day.
+            failures.append(f"{bq.id}: {len(query)} chars exceeds the API limit")
+            telemetry.append({"queryId": bq.id, "tier": bq.tier,
+                              "error": f"over {API_MAX_QUERY_CHARS} chars"})
+            continue
         try:
-            tweets = client.search(bq.query, query_type="Latest", max_pages=1)
+            tweets = client.search(query, query_type="Latest", max_pages=1)
         except TwitterApiError as exc:
             # A partial failure must never wipe good data: record and continue.
             failures.append(f"{bq.id}: {exc}")
@@ -257,17 +352,24 @@ def run(
     for row in telemetry:
         row["uniqueFirstSeen"] = unique_by_query.get(row["queryId"], 0)
 
-    capped = deduped[:max_obs]
-    overflow = len(deduped) - len(capped)
-
-    observations = [to_observation(r, now) for r in capped]
-
-    # --- merge ------------------------------------------------------------
+    # R11. `deduped[:max_obs]` took the first N in query order, so the families
+    # built first always won and the ones built last were dropped whenever a day
+    # was busy — a systematic bias dressed up as a cap. Selection is now
+    # round-robin across queries, and the surplus is carried rather than
+    # counted.
     try:
         existing = store.read_json(store.observations_path(), [])
     except store.CorruptStoreError as exc:
         return {"ok": False, "error": f"refusing to run: {exc}"}
 
+    backlog_in = _load_backlog()
+    pending, backlog_used = _combine_with_backlog(backlog_in, deduped, existing)
+    capped, deferred = select_fairly(pending, max_obs)
+    overflow = len(deferred)
+
+    observations = [to_observation(r, now) for r in capped]
+
+    # --- merge ------------------------------------------------------------
     merged, added, updated = merge_observations(existing, observations, now)
 
     with_ids = sum(1 for o in observations if o.has_external_identifier())
@@ -281,7 +383,9 @@ def run(
         "tweetsFetched": len(raw_records),
         "afterDedupe": len(deduped),
         "processed": len(capped),
+        "backlogConsumed": backlog_used,
         "overflowDeferred": overflow,
+        "windowStart": window_start.isoformat() if windowed else None,
         "observationsAdded": added,
         "observationsUpdated": updated,
         "observationsTotal": len(merged),
@@ -294,12 +398,16 @@ def run(
         summary["proposedMutations"] = {
             "observations.json": f"+{added} new, ~{updated} updated",
             "raw/twitter/%s.json" % today: f"{len(capped)} records",
+            "ingest_backlog.json": f"{len(deferred)} carried to the next run",
         }
         return summary
 
     # --- persist (atomic) -------------------------------------------------
     store.write_json(store.observations_path(), merged)
     store.write_json(store.raw_path(today), [r.model_dump(mode="json") for r in capped])
+    # Carry the surplus rather than dropping it. Already fetched, already paid.
+    store.write_json(store.backlog_path(),
+                     [r.model_dump(mode="json") for r in deferred])
 
     removed = store.prune_raw(automation.get("rawRetention", {}).get("keepDays", 30), today)
     summary["rawPruned"] = removed

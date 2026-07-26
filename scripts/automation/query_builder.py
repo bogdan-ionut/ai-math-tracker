@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -39,6 +40,25 @@ CONFIG = ROOT / "config" / "twitter_discovery.json"
 # 32-term one returning none.
 API_MAX_QUERY_CHARS = 512   # measured: 512 works, 513 does not
 MAX_QUERY_CHARS = 500       # what we ship, with margin
+
+# R2. The lookback window is appended at fetch time as
+# `since_time:<unix> until_time:<unix>` — 44 characters, and they come out of
+# the same 512-character budget. Sharding therefore has to leave room for a
+# window that does not exist yet at build time; otherwise adding it would push
+# a query over the limit and back into the silent zero.
+#
+# The date form `since:/until:` is NOT used. It is not ignored — it is applied
+# *wrongly*: a probe asking for 2026-07-19…07-21 returned twenty tweets all
+# dated 07-22, none inside the window. The unix form was exact on the same
+# check, and second precision is what a 30-hour lookback needs anyway.
+TIME_WINDOW_CHARS = 48      # 44 measured, rounded up
+BUILD_CHAR_BUDGET = MAX_QUERY_CHARS - TIME_WINDOW_CHARS
+
+
+def with_time_window(query: str, since: datetime, until: datetime) -> str:
+    """Constrain a query to a half-open window, server-side."""
+    return (f"{query} since_time:{int(since.timestamp())} "
+            f"until_time:{int(until.timestamp())}")
 
 _GROUP_RE = re.compile(r"\(([^()]*)\)")
 
@@ -76,7 +96,7 @@ class BuiltQuery:
         }
 
 
-def split_for_length(bq: BuiltQuery, cap: int = MAX_QUERY_CHARS) -> list[BuiltQuery]:
+def split_for_length(bq: BuiltQuery, cap: int = BUILD_CHAR_BUDGET) -> list[BuiltQuery]:
     """Split a query that exceeds the 512-character limit into equivalent shards.
 
     `(A) (B)` with the whole thing too long becomes `(A) (b1…bk)`,
