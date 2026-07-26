@@ -21,7 +21,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from scripts.automation.ids import candidate_id as make_candidate_id
+from scripts.automation.ids import candidate_id as make_candidate_id, slugify
 from scripts.automation.matching import MatchOutcome
 from scripts.automation.models import utc_now_iso
 from scripts.automation.policy import (
@@ -186,10 +186,16 @@ class Candidate(BaseModel):
     firstSeenAt: str
     lastSeenAt: str
 
+    # Ids this candidate absorbed. An id is assigned once and kept for life, so
+    # when a late identifier reveals two records to be the same problem they are
+    # merged rather than renamed — and the vanished id stays traceable.
+    mergedFrom: list[str] = Field(default_factory=list)
+
 
 class MergeReport(BaseModel):
     candidatesCreated: int = 0
     candidatesUpdated: int = 0
+    candidatesMerged: int = 0
     claimsAdded: int = 0
     sourcesAttached: int = 0
     reviewsCreated: int = 0
@@ -220,17 +226,87 @@ def _same_claim(a: Claim, b: Claim) -> bool:
     )
 
 
+def _shares_identifier(a: dict | None, b: dict | None) -> bool:
+    """True if two records assert the same value for the same identifier kind."""
+    a, b = a or {}, b or {}
+    return any(set(a.get(kind) or []) & set(values)
+               for kind, values in b.items() if values)
+
+
+def _find_existing(candidates: list[dict], name: str, ext: dict) -> list[str]:
+    """Ids of candidates that are the same problem as (name, ext).
+
+    Identifier first, because it is the stronger evidence; exact canonical name
+    otherwise. More than one hit means two records that were already the same
+    problem — which is precisely what an identifier arriving late reveals.
+    """
+    slug = slugify(name)
+    hits = []
+    for c in candidates:
+        if (_shares_identifier(c.get("externalIds"), ext)
+                or slugify(c.get("canonicalName") or "") == slug):
+            hits.append(c["id"])
+    return hits
+
+
+def _absorb(primary: dict, other: dict) -> dict:
+    """Fold `other` into `primary`. Every list-valued field only grows."""
+    out = dict(primary)
+    for field in ("observationIds", "sources", "aliases"):
+        out[field] = sorted(set(out.get(field) or []) | set(other.get(field) or []))
+    merged_ext = dict(out.get("externalIds") or {})
+    for kind, values in (other.get("externalIds") or {}).items():
+        merged_ext[kind] = sorted(set(merged_ext.get(kind) or []) | set(values))
+    out["externalIds"] = merged_ext
+    claims = list(out.get("claims") or [])
+    for raw in other.get("claims") or []:
+        candidate_claim = Claim(**raw)
+        if not any(_same_claim(Claim(**c), candidate_claim) for c in claims):
+            claims.append(raw)
+    out["claims"] = claims
+    out["problemRef"] = out.get("problemRef") or other.get("problemRef")
+    out["firstSeenAt"] = min(x for x in (out.get("firstSeenAt"),
+                                         other.get("firstSeenAt")) if x)
+    out["lastSeenAt"] = max(x for x in (out.get("lastSeenAt"),
+                                        other.get("lastSeenAt")) if x)
+    out.setdefault("mergedFrom", [])
+    out["mergedFrom"] = sorted(set(out["mergedFrom"]) | {other["id"]}
+                               | set(other.get("mergedFrom") or []))
+    return out
+
+
 def _upsert_candidate(
     candidates: list[dict], obs: dict, matched_id: str | None, now: str
-) -> tuple[list[dict], str, bool, bool, bool]:
+) -> tuple[list[dict], str, bool, bool, bool, int]:
     """Create or extend a candidate. Returns
-    (candidates, candidate_id, created, claim_added, source_attached)."""
+    (candidates, candidate_id, created, claim_added, source_attached, merged).
+
+    A candidate's id is assigned once and kept for life. It used to be derived
+    from whatever identifiers the observation happened to carry, so the day an
+    arXiv id turned up, the same problem acquired a second id and a second
+    record — one problem, three ids across three days. Identity is now resolved
+    by *looking for* an existing candidate first, and a late-arriving identifier
+    that reveals two records to be the same problem merges them rather than
+    renaming either.
+    """
     ex = obs.get("extraction") or {}
     name = ex.get("canonicalProblemName") or obs.get("url") or obs["id"]
     ext = obs.get("externalIds") or {}
-    cid = make_candidate_id(name, ext)
 
     by_id = {c["id"]: dict(c) for c in candidates}
+    hits = _find_existing(candidates, name, ext)
+    merged_count = 0
+
+    if hits:
+        # Oldest wins, so an id never changes once anything else refers to it.
+        hits.sort(key=lambda i: (by_id[i].get("firstSeenAt") or "", i))
+        cid, rest = hits[0], hits[1:]
+        for other in rest:
+            by_id[cid] = _absorb(by_id[cid], by_id.pop(other))
+            merged_count += 1
+    else:
+        cid = make_candidate_id(name, ext)
+
     claim = _claim_from(obs, now)
     created = claim_added = source_attached = False
 
@@ -277,7 +353,7 @@ def _upsert_candidate(
         by_id[cid] = cur
 
     ordered = sorted(by_id.values(), key=lambda c: (c.get("firstSeenAt", ""), c["id"]))
-    return ordered, cid, created, claim_added, source_attached
+    return ordered, cid, created, claim_added, source_attached, merged_count
 
 
 # --------------------------------------------------------------------------
@@ -394,11 +470,12 @@ def apply_decision(
             review("no_corroboration", why_corr)
             return candidates, review_queue, report
 
-        candidates, cid, created, claim_added, src = _upsert_candidate(
+        candidates, cid, created, claim_added, src, merged = _upsert_candidate(
             candidates, obs, resolution.matched_id, now
         )
         report.candidatesCreated += int(created)
         report.candidatesUpdated += int(not created)
+        report.candidatesMerged += merged
         report.claimsAdded += int(claim_added)
         report.sourcesAttached += int(src)
         report.notes.append(f"{decision}: candidate {cid} ({why_corr})")

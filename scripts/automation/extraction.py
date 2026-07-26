@@ -13,6 +13,8 @@ Contract:
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import argparse
 import json
 import sys
@@ -35,7 +37,7 @@ from scripts.automation.gemini import (  # noqa: E402
     StructuredModel,
 )
 from scripts.automation.ids import text_hash  # noqa: E402
-from scripts.automation.models import ProcessingState, utc_now_iso  # noqa: E402
+from scripts.automation.models import Observation, ProcessingState, utc_now_iso  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
@@ -80,13 +82,102 @@ def cache_key(obs: dict, prompt_version: str, model: str) -> str:
     return text_hash(basis) or ""
 
 
-def needs_extraction(obs: dict, prompt_version: str, model: str, force: bool) -> bool:
+# Statuses whose extraction question is settled. `review` belongs here: a
+# curator looking at an observation is not a reason to pay Gemini to read it
+# again tomorrow, and every day it sat in the queue it was re-extracted.
+RESOLVED_STATUSES = ("irrelevant", "extracted", "matched", "merged", "review")
+
+# Backoff after a failed extraction, in hours. A post the model cannot parse
+# today will usually still be unparseable tomorrow, and it used to cost a call
+# every single run, forever. After the last step the failure is permanent and
+# only a changed text, prompt or model revives it.
+RETRY_BACKOFF_HOURS = (1, 6, 24, 72)
+
+
+def _iso(when: datetime) -> str:
+    return when.astimezone(timezone.utc).isoformat()
+
+
+def needs_extraction(obs: dict, prompt_version: str, model: str, force: bool,
+                     now: datetime | None = None) -> bool:
     if force:
         return True
-    if obs.get("status") in ("irrelevant", "extracted", "matched", "merged"):
-        # already resolved — only reprocess when the cache key moved
-        return obs.get("extractionCacheKey") != cache_key(obs, prompt_version, model)
+
+    # A moved cache key means the text, the prompt or the model changed, so the
+    # previous answer — success or failure — no longer speaks to this input.
+    key_moved = obs.get("extractionCacheKey") != cache_key(obs, prompt_version, model)
+
+    if obs.get("status") in RESOLVED_STATUSES:
+        return key_moved
+
+    if obs.get("status") == "extraction_failed":
+        if key_moved:
+            return True
+        if obs.get("failureType") == "permanent":
+            return False
+        nxt = obs.get("nextRetryAt")
+        if not nxt:
+            return True
+        return _iso(now or datetime.now(timezone.utc)) >= nxt
+
     return True
+
+
+def _record_failure(obs: dict, message: str, prompt_version: str, model_name: str,
+                    now: datetime | None = None) -> dict:
+    """Mark a failed extraction and schedule when — or whether — to try again."""
+    now = now or datetime.now(timezone.utc)
+    attempts = int(obs.get("extractionAttempts") or 0) + 1
+
+    obs = dict(obs)
+    obs["status"] = "extraction_failed"
+    obs["extractionError"] = message
+    obs["extractionModel"] = model_name
+    obs["extractionPromptVersion"] = prompt_version
+    obs["extractionAttempts"] = attempts
+    obs["lastAttemptAt"] = _iso(now)
+    # Stored so a *changed* text or prompt is recognised as a new question
+    # rather than another attempt at the old one.
+    obs["extractionCacheKey"] = cache_key(obs, prompt_version, model_name)
+
+    if attempts > len(RETRY_BACKOFF_HOURS):
+        obs["failureType"] = "permanent"
+        obs["nextRetryAt"] = None
+    else:
+        obs["failureType"] = "transient"
+        obs["nextRetryAt"] = _iso(
+            now + timedelta(hours=RETRY_BACKOFF_HOURS[attempts - 1])
+        )
+    return obs
+
+
+EXCERPT_CHARS = 160
+
+
+def redact_resolved(observations: list[dict], limit: int = EXCERPT_CHARS) -> list[dict]:
+    """Replace full text with an excerpt once the observation is resolved.
+
+    R10. The text of third-party posts was committed in full, indefinitely, to a
+    public repository. It is needed to extract from, and after that the
+    structured `extraction` payload is what everything downstream reads — so the
+    full text is transient and the excerpt plus `textSha256` plus the URL is the
+    durable record.
+
+    Deliberately not applied to unresolved observations: those still have to be
+    sent to the model, and truncating them first would silently degrade every
+    extraction.
+    """
+    out = []
+    for obs in observations:
+        if obs.get("status") in RESOLVED_STATUSES and obs.get("text"):
+            obs = dict(obs)
+            text = obs["text"]
+            obs["textExcerpt"] = (
+                text if len(text) <= limit else text[:limit].rstrip() + "…"
+            )
+            obs["text"] = None
+        out.append(obs)
+    return out
 
 
 def extract_one(
@@ -101,22 +192,13 @@ def extract_one(
     try:
         raw = model_client.generate_json(prompt, gemini_response_schema())
     except (SchemaViolation, GeminiError) as exc:
-        obs = dict(obs)
-        obs["status"] = "extraction_failed"
-        obs["extractionError"] = str(exc)
-        obs["extractionModel"] = model_name
-        obs["extractionPromptVersion"] = prompt_version
-        return obs, str(exc)
+        return _record_failure(obs, str(exc), prompt_version, model_name), str(exc)
 
     try:
         result = ExtractionResult(**raw)
     except ValidationError as exc:
-        obs = dict(obs)
-        obs["status"] = "extraction_failed"
-        obs["extractionError"] = f"schema validation failed: {exc.error_count()} error(s)"
-        obs["extractionModel"] = model_name
-        obs["extractionPromptVersion"] = prompt_version
-        return obs, obs["extractionError"]
+        message = f"schema validation failed: {exc.error_count()} error(s)"
+        return _record_failure(obs, message, prompt_version, model_name), message
 
     verified_ids, warnings = cross_check_identifiers(
         result, obs.get("text"), obs.get("links")
@@ -132,6 +214,9 @@ def extract_one(
     obs["extractionConfidence"] = result.extractionConfidence
     obs["extractionCacheKey"] = cache_key(obs, prompt_version, model_name)
     obs["extractionError"] = None
+    obs["extractionAttempts"] = 0
+    obs["failureType"] = None
+    obs["nextRetryAt"] = None
     if warnings:
         obs["extractionWarnings"] = warnings
     # merge verified identifiers back onto the observation for matching
@@ -156,7 +241,7 @@ def run(
     max_calls = limit or ex.get("maxCallsPerRun", 50)
 
     try:
-        observations = store.read_json(store.observations_path(), [])
+        observations = store.read_records(store.observations_path(), Observation)
     except store.CorruptStoreError as exc:
         return {"ok": False, "error": f"refusing to run: {exc}"}
 
@@ -218,7 +303,7 @@ def run(
         }
         return summary
 
-    store.write_json(store.observations_path(), merged)
+    store.write_records(store.observations_path(), Observation, redact_resolved(merged))
 
     try:
         state = ProcessingState(**store.read_json(store.state_path(), {}))

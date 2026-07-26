@@ -32,6 +32,12 @@ def obs(*, oid="obs_1", ext=None, conf=0.9, name="Erdős #728", url="https://x.c
         claim="new_result", result="proof", model="GPT-5.6") -> dict:
     return {
         "id": oid, "url": url, "author": "a", "sourceCreatedAt": "Thu Jul 23 14:00:00 +0000 2026",
+        # These four are required by the Observation contract. The fixture used
+        # to omit them and nothing minded, because nothing validated the file —
+        # which is the defect R4 closes, so the fixture has to be honest now.
+        "sourceType": "twitter", "sourceNativeId": oid.replace("obs_", ""),
+        "collectedAt": "2026-07-23T14:05:00+00:00",
+        "lastSeenAt": "2026-07-23T14:05:00+00:00",
         "text": "some post", "externalIds": ext if ext is not None else {"erdos": ["728"]},
         "extractionConfidence": conf,
         "extraction": {

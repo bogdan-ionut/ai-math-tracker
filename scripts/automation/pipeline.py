@@ -25,10 +25,11 @@ from scripts.automation.matching import (  # noqa: E402
     load_registry,
     match_observation,
 )
-from scripts.automation.merge import apply_decision, resolve  # noqa: E402
-from scripts.automation.models import ProcessingState, utc_now_iso  # noqa: E402
+from scripts.automation.merge import Candidate, apply_decision, resolve  # noqa: E402
+from scripts.automation.extraction import redact_resolved  # noqa: E402
+from scripts.automation.models import Observation, ProcessingState, utc_now_iso  # noqa: E402
 from scripts.automation.policy import assert_registry_untouched  # noqa: E402
-from scripts.automation.review import summarize  # noqa: E402
+from scripts.automation.review import ReviewEntry, summarize  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
@@ -61,9 +62,9 @@ def run(dry_run: bool = False, judge_client: StructuredModel | None = None,
     shortlist_size = jcfg.get("shortlistSize", 5)
 
     try:
-        observations = store.read_json(store.observations_path(), [])
-        candidates = store.read_json(store.candidates_path(), [])
-        queue = store.read_json(store.review_queue_path(), [])
+        observations = store.read_records(store.observations_path(), Observation)
+        candidates = store.read_records(store.candidates_path(), Candidate)
+        queue = store.read_records(store.review_queue_path(), ReviewEntry)
     except store.CorruptStoreError as exc:
         return {"ok": False, "error": f"refusing to run: {exc}"}
 
@@ -173,10 +174,12 @@ def run(dry_run: bool = False, judge_client: StructuredModel | None = None,
         }
         return summary
 
-    store.write_json(store.candidates_path(), candidates)
-    store.write_json(store.review_queue_path(), queue)
-    store.write_json(store.observations_path(),
-                     sorted(by_id.values(), key=lambda o: (o.get("sourceCreatedAt") or "", o["id"])))
+    store.write_records(store.candidates_path(), Candidate, candidates)
+    store.write_records(store.review_queue_path(), ReviewEntry, queue)
+    # Redact here too: the pipeline resolves observations to `merged`/`review`,
+    # so text that survived extraction becomes durable at this point.
+    store.write_records(store.observations_path(), Observation, redact_resolved(
+        sorted(by_id.values(), key=lambda o: (o.get("sourceCreatedAt") or "", o["id"]))))
 
     try:
         state = ProcessingState(**store.read_json(store.state_path(), {}))

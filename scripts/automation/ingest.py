@@ -375,7 +375,7 @@ def run(
     # round-robin across queries, and the surplus is carried rather than
     # counted.
     try:
-        existing = store.read_json(store.observations_path(), [])
+        existing = store.read_records(store.observations_path(), Observation)
     except store.CorruptStoreError as exc:
         return {"ok": False, "error": f"refusing to run: {exc}"}
 
@@ -420,7 +420,7 @@ def run(
         return summary
 
     # --- persist (atomic) -------------------------------------------------
-    store.write_json(store.observations_path(), merged)
+    store.write_records(store.observations_path(), Observation, merged)
     store.write_json(store.raw_path(today), [r.model_dump(mode="json") for r in capped])
     # Carry the surplus rather than dropping it. Already fetched, already paid.
     store.write_json(store.backlog_path(),

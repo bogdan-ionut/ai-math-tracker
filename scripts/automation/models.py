@@ -42,7 +42,13 @@ class RawTweet(BaseModel):
     createdAt: Optional[str] = None
     collectedAt: str
     matchedQueryId: str
+    # Full text is *working state*, not the durable record. Once extraction has
+    # resolved an observation, the derived facts live in `extraction` and the
+    # text is reduced to an excerpt — so the long-lived, committed file carries
+    # a quotation rather than a republication of someone else's post. The full
+    # text stays in data/automation/raw/, which is pruned on `rawRetention`.
     text: Optional[str] = None
+    textExcerpt: Optional[str] = None
     textSha256: Optional[str] = None
     links: list[str] = Field(default_factory=list)
     # engagement is stored for provenance only and MUST NOT influence
@@ -68,7 +74,13 @@ class Observation(BaseModel):
     collectedAt: str
     lastSeenAt: str
     matchedQueryIds: list[str] = Field(default_factory=list)
+    # Full text is *working state*, not the durable record. Once extraction has
+    # resolved an observation, the derived facts live in `extraction` and the
+    # text is reduced to an excerpt — so the long-lived, committed file carries
+    # a quotation rather than a republication of someone else's post. The full
+    # text stays in data/automation/raw/, which is pruned on `rawRetention`.
     text: Optional[str] = None
+    textExcerpt: Optional[str] = None
     textSha256: Optional[str] = None
     links: list[str] = Field(default_factory=list)
     externalIds: dict[str, list[str]] = Field(default_factory=dict)
@@ -81,6 +93,21 @@ class Observation(BaseModel):
     extractionPromptVersion: Optional[str] = None
     extractionConfidence: Optional[float] = None
     extractionError: Optional[str] = None
+
+    # Written by the extraction stage. These were persisted for weeks without
+    # being declared here: `extra = "forbid"` only bites when something is
+    # actually validated, and nothing validated the file. R4 closes that.
+    extractionCacheKey: Optional[str] = None
+    extractionWarnings: list[str] = Field(default_factory=list)
+    extractionAttempts: int = 0
+    lastAttemptAt: Optional[str] = None
+    nextRetryAt: Optional[str] = None
+    failureType: Optional[Literal["transient", "permanent"]] = None
+
+    # Written by the pipeline stage — likewise previously undeclared.
+    matchMethod: Optional[str] = None
+    decision: Optional[str] = None
+
     candidateId: Optional[str] = None
     problemRef: Optional[str] = None   # id in data/results.json, once matched
 

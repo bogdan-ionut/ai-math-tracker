@@ -6,7 +6,7 @@
 
 **Last updated:** 2026-07-26
 **Phase:** executing the revised plan
-**Next sprint:** 5.4 — Data contracts, cost and identity
+**Next sprint:** 5.5 — Real no-write end-to-end → gate to live writes
 **Live writes:** 🔴 **disabled** (`dryRunOnSchedule: true`) — gate is Sprint 5.5
 
 ---
@@ -33,10 +33,10 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (334), and CI gates every merge |
+| Local test coverage | good (372), and CI gates every merge |
 | Retrieval correctness | sound — window server-side, cap shared round-robin, surplus carried |
 | Judge stage | sound — its verdict is used, validated, and never faked |
-| Data-contract validation | JSON-parseable only, not model-validated |
+| Data-contract validation | validated against the models on every read and write |
 | Empirical calibration | **none** — the scheduled dry run has never exercised Gemini |
 
 ---
@@ -56,9 +56,9 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | ~~R2~~ | ~~No server-side time window~~ — `since_time`/`until_time`; date form found broken | ✅ | closed 5.3 |
 | **R1** | Scheduled dry run skips extraction and pipeline entirely | 🔴 critical | 5.5 |
 | **R5** | Matching never searches the candidate store | 🟠 major | 6 |
-| **R15+** | `candidate_id` unstable under identifier acquisition → duplicates from one source | 🟠 major | 5.4 |
-| **R3** | `review` observations re-extracted daily (wasted Gemini) | 🟠 major | 5.4 |
-| **R4** | Pydantic models do not validate persisted files | 🟠 major | 5.4 |
+| ~~R15+~~ | ~~`candidate_id` unstable under identifier acquisition~~ | ✅ | closed 5.4 |
+| ~~R3~~ | ~~`review` observations re-extracted daily~~ — plus retry backoff | ✅ | closed 5.4 |
+| ~~R4~~ | ~~Pydantic models do not validate persisted files~~ | ✅ | closed 5.4 |
 | ~~R11~~ | ~~Unfair per-run cap; overflow counted, not queued~~ | ✅ | closed 5.3 |
 | ~~K10~~ | ~~Six of fourteen queries return zero~~ — TwitterAPI.io truncates at 512 chars | ✅ | closed 5.3 |
 | **R6** | Corroboration accepts a bare GitHub link | 🟠 major | 6 |
@@ -66,7 +66,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 | ~~R15~~ | ~~Bot push has no rebase/retry~~ | ✅ | closed 5.1 |
 | ~~R12~~ | ~~`changes.py` unexpected check unreachable~~ | ✅ | closed 5.1 |
 | ~~R13~~ | ~~README claims there is no scraper~~ | ✅ | closed 5.1 |
-| **R10** | `storeTweetText: true` commits third-party text | 🟡 minor | 5.4 |
+| ~~R10~~ | ~~`storeTweetText: true` commits third-party text~~ | ✅ | closed 5.4 |
 | **R8** | No curator workflow | 🟡 minor | 6.5 |
 | ~~K11~~ | ~~TwitterAPI.io out of credit~~ | ✅ | topped up 2026-07-25 |
 | **K6** | Only 13/40 curated records carry a source URL | 🟡 minor | human backfill |
@@ -103,7 +103,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 334 / 334 (`python -m pytest`) — no network, no API keys.
+**Passing:** 372 / 372 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
 was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
@@ -113,6 +113,40 @@ every one of 232 tests took the branch that has no judge in it.
 ---
 
 ## Completed since the re-plan
+
+### Sprint 5.4 — Data contracts, cost and identity ✅
+
+**R4 — the contract is now enforced.** Every model sets `extra = "forbid"`, which buys
+nothing unless something validates, and nothing did: the workflow checked only that these
+files were parseable JSON. Wiring `TypeAdapter` validation into every read and write
+surfaced **eight fields that had been persisted for weeks without being declared** —
+`extractionCacheKey`, `extractionWarnings`, `extractionAttempts`, `lastAttemptAt`,
+`nextRetryAt`, `failureType`, `matchMethod`, `decision` — and a test fixture that had never
+been a valid `Observation` at all. Validating on *write* catches the bug in the run that
+caused it; on *read*, a file edited by hand or left by an older version. `ContractError` is
+kept distinct from `CorruptStoreError`: a file that parses but is not what the code thinks it
+is, is the more dangerous case, because everything downstream keeps working on data it has
+misread.
+
+**R3 — we stop paying for settled questions.** `review` is now a resolved state, so an
+observation sitting in a curator's queue is no longer re-sent to Gemini every day it waits.
+A failed extraction backs off 1h → 6h → 24h → 72h and then stops: one permanently malformed
+post used to cost a call every run, forever. Measured on a broken post: **5 calls over 12
+runs instead of 12**, then permanent — and a changed text, prompt or model still revives it.
+
+**R15+ / D36 — an id is assigned once and kept for life.** `candidate_id` was derived from
+whatever identifiers an observation happened to carry, so the day an arXiv id arrived the
+same problem acquired a second id and a second record. Identity is now resolved by *looking
+for* an existing candidate — identifier first, canonical name otherwise — and a late
+identifier that reveals two records to be one problem **merges** them, oldest id surviving,
+with `mergedFrom` keeping the vanished id traceable. Verified: three days, three identifier
+states, **one candidate** where there used to be three.
+
+**R10 — an excerpt, not a republication.** Full post text is working state: it is fetched,
+extracted from, and then reduced to a 160-character excerpt once the observation resolves.
+The durable committed record is excerpt + `textSha256` + URL; the complete text lives only in
+`data/automation/raw/`, which `rawRetention` prunes. Unresolved observations keep their full
+text, since truncating before extraction would silently degrade every extraction.
 
 ### Sprint 5.3 — Retrieval correctness ✅
 

@@ -9,7 +9,7 @@
     "maxRetries": 3,
     "retryBackoffSeconds": 2.0,
     "storeTweetText": true,
-    "$storeTweetTextComment": "When false, only a SHA-256 of the text is persisted. Text is needed for extraction and reprocessing; set false if republishing third-party text in a public repo becomes a concern.",
+    "$storeTweetTextComment": "Full text is fetched and used for extraction, then reduced to a 160-char excerpt once the observation is resolved (see extraction.redact_resolved). The complete text lives only in data/automation/raw/, which rawRetention prunes. Set false to avoid persisting text even for the run.",
     "minRequestIntervalSeconds": 1.5,
     "$pacingComment": "TwitterAPI.io returns 429 on rapid bursts (measured: ~40% of 37 back-to-back calls). Requests are paced, not just retried."
   },

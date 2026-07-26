@@ -44,6 +44,57 @@ def read_json(path: Path, default: Any) -> Any:
         raise CorruptStoreError(f"{path} is not valid JSON: {exc}") from exc
 
 
+class ContractError(RuntimeError):
+    """Raised when a persisted file does not match its declared model.
+
+    Distinct from CorruptStoreError: the file parses perfectly, it simply is not
+    what the code claims it is. That is the more dangerous case, because
+    everything downstream keeps working on data it has misread.
+    """
+
+
+def validate_records(model: type, rows: Any, *, path: Path, when: str) -> list:
+    """Check `rows` against `model` and say clearly what failed.
+
+    Every model here sets `extra = "forbid"`, which is worth nothing unless
+    something validates. Until now the workflow checked only that these files
+    were parseable JSON, so six fields the extraction stage wrote had never been
+    declared and nothing noticed.
+
+    Validating on **write** catches the bug in the run that caused it; on
+    **read**, it catches a file edited by hand or left behind by an older
+    version.
+    """
+    from pydantic import TypeAdapter, ValidationError
+
+    if not isinstance(rows, list):
+        raise ContractError(f"{path} ({when}): expected a list, got {type(rows).__name__}")
+    try:
+        return TypeAdapter(list[model]).validate_python(rows)
+    except ValidationError as exc:
+        first = exc.errors()[:3]
+        detail = "; ".join(
+            f"[{'.'.join(str(p) for p in e['loc'])}] {e['msg']}" for e in first
+        )
+        raise ContractError(
+            f"{path} ({when}) does not match {model.__name__}: "
+            f"{exc.error_count()} error(s) — {detail}"
+        ) from exc
+
+
+def read_records(path: Path, model: type, default: Any = None) -> list[dict]:
+    """Read and validate, returning plain dicts so callers keep working on dicts."""
+    rows = read_json(path, default if default is not None else [])
+    validate_records(model, rows, path=path, when="on read")
+    return rows
+
+
+def write_records(path: Path, model: type, rows: list) -> None:
+    """Validate, then write atomically. A contract breach never reaches disk."""
+    validate_records(model, rows, path=path, when="before write")
+    write_json(path, rows)
+
+
 def write_json(path: Path, payload: Any) -> None:
     """Serialise ``payload`` to ``path`` atomically."""
     path.parent.mkdir(parents=True, exist_ok=True)

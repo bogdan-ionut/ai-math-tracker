@@ -18,8 +18,8 @@ further defects in the judge stage.
 | **5.1** | **Truthfulness and CI** | **completed** |
 | **5.2** | **Make the judge actually decide** | **completed** |
 | **5.3** | **Retrieval correctness** | **completed** |
-| **5.4** | **Data contracts, cost and identity** | **planned — next** |
-| **5.5** | **Real no-write end-to-end → gate to live writes** | planned |
+| **5.4** | **Data contracts, cost and identity** | **completed** |
+| **5.5** | **Real no-write end-to-end → gate to live writes** | **planned — next** |
 | 6 | Multi-source + candidate entity resolution | planned |
 | 6.5 | Curator workflow | planned |
 | 7 | Frontend candidate visibility (optional) | planned |
@@ -150,7 +150,7 @@ lost. Backlog drains deterministically across runs. K10 answered in the strategy
 
 ---
 
-## Sprint 5.4 — Data contracts, cost and identity · `planned`
+## Sprint 5.4 — Data contracts, cost and identity · `completed`
 
 **Objective.** Make the persisted files match their declared models, stop paying for the
 same observation daily, and make candidate identity stable.
