@@ -56,11 +56,25 @@ class TestSignalsNeverBecomeResults:
 
     def test_signals_cannot_move_a_single_site_figure(self, tmp_path):
         """The precise claim: build with candidates present, and every published
-        figure is byte-identical to the build without them."""
+        figure is identical to the build without them.
+
+        `generatedAt` is excluded, and only that. It is a build timestamp, not a
+        figure about the dataset, and comparing it made this test pass or fail on
+        whether two subprocesses happened to land in the same second — it went
+        green locally and red in CI for exactly that reason.
+        """
+        def strip_volatile(payload):
+            if isinstance(payload, dict):
+                return {k: strip_volatile(v) for k, v in payload.items()
+                        if k != "generatedAt"}
+            if isinstance(payload, list):
+                return [strip_volatile(v) for v in payload]
+            return payload
+
         def build_and_read():
             subprocess.run([sys.executable, "scripts/build_data.py"], cwd=ROOT,
                            check=True, capture_output=True)
-            return {name: (PUBLIC / name).read_bytes()
+            return {name: strip_volatile(json.loads((PUBLIC / name).read_text()))
                     for name in ("conjectures.json", "summary.json")}
 
         without = build_and_read()
