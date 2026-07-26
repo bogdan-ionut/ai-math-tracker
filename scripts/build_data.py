@@ -138,6 +138,75 @@ def build_summary(records: list[MathematicalResult]) -> Summary:
     )
 
 
+# --------------------------------------------------------------------------
+# Sprint 7 — automated signals, kept strictly apart from the tracker
+# --------------------------------------------------------------------------
+
+CANDIDATES = ROOT / "data" / "automation" / "candidates.json"
+
+# What a signal is allowed to say on the site. An allowlist rather than a
+# blocklist: a field added to the candidate model later must be chosen for
+# publication deliberately, not inherited by default.
+SIGNAL_FIELDS = (
+    "id", "canonicalName", "family", "externalIds", "sources",
+    "firstSeenAt", "lastSeenAt", "problemRef",
+)
+
+# Tiers, mirroring scripts/automation/policy.py. Duplicated on purpose: this
+# script must not import the automation package, so that nothing in the build
+# path can reach code that writes stores.
+EVIDENCE_TIERS = {"published": ("doi", "arxiv"),
+                  "registered": ("erdos", "oeis"),
+                  "referenced": ("github", "lean")}
+
+
+def _tier(external: dict) -> str:
+    for tier, kinds in EVIDENCE_TIERS.items():
+        if any(external.get(k) for k in kinds):
+            return tier
+    return "none"
+
+
+def build_signals() -> list[dict]:
+    """Publish pending candidates as *signals* — never as results.
+
+    These are unverified reports that automation grouped. They are emitted to a
+    separate file, counted in no metric, and rendered in a separate section, so
+    that nothing the pipeline proposes can ever be mistaken for something the
+    tracker stands behind. A candidate becomes a result only through the draft
+    pull request that `scripts/automation/curate.py promote` opens.
+    """
+    if not CANDIDATES.exists():
+        return []
+    try:
+        rows = json.loads(CANDIDATES.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(rows, list):
+        return []
+
+    signals = []
+    for c in rows:
+        if not isinstance(c, dict) or c.get("status", "pending") != "pending":
+            continue
+        out = {k: c.get(k) for k in SIGNAL_FIELDS}
+        claims = [x for x in (c.get("claims") or []) if isinstance(x, dict)]
+        first = claims[0] if claims else {}
+        out["claimCount"] = len(claims)
+        out["observationCount"] = len(c.get("observationIds") or [])
+        out["modelName"] = first.get("modelName")
+        out["organization"] = first.get("organization")
+        out["resultType"] = first.get("resultType")
+        out["claimedAt"] = first.get("claimedAt")
+        out["evidenceTier"] = _tier(c.get("externalIds") or {})
+        # Deliberately absent: summary text, impact, assessment, confidence.
+        # The first is model-written prose about someone else's post; the rest
+        # are editorial judgements that no automated record is entitled to.
+        signals.append(out)
+    signals.sort(key=lambda s: (s.get("lastSeenAt") or "", s["id"]), reverse=True)
+    return signals
+
+
 def main() -> None:
     records = load()
     check_invariants(records)
@@ -164,6 +233,23 @@ def main() -> None:
         )
     )
 
+    signals = build_signals()
+    (OUT / "signals.json").write_text(
+        json.dumps(
+            {
+                "generatedAt": summary.generated_at,
+                "count": len(signals),
+                "disclaimer": (
+                    "Unverified automated signals. These are not tracker results: "
+                    "nothing here has been audited, assessed, or counted in any "
+                    "figure on this site."
+                ),
+                "signals": signals,
+            },
+            indent=2, ensure_ascii=False,
+        )
+    )
+
     (OUT / "schema.json").write_text(
         json.dumps(MathematicalResult.model_json_schema(by_alias=True), indent=2)
     )
@@ -171,7 +257,7 @@ def main() -> None:
     print(
         f"\033[32mOK\033[0m {len(records)} records -> {summary.total} problems "
         f"({summary.by_status}) | Erdős {summary.erdos_count} | "
-        f"{summary.model_families} model families"
+        f"{summary.model_families} model families | {len(signals)} unverified signals"
     )
 
 

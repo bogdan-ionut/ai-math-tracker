@@ -22,7 +22,7 @@ further defects in the judge stage.
 | **5.5** | **Real no-write end-to-end → gate to live writes** | **completed — gate blocked on K12** |
 | 6 | Multi-source + candidate entity resolution | **partly done** (R5, R6 closed; extra sources pending) |
 | 6.5 | Curator workflow | **completed** |
-| 7 | Frontend candidate visibility (optional) | planned |
+| 7 | Frontend candidate visibility | **completed** |
 | 8 | Hardening and operational documentation | planned |
 
 > **Sprints 0–5 are unchanged and remain as delivered.** Their detail has been moved to

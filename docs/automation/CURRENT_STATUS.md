@@ -33,7 +33,7 @@ Delivered sprint detail: **[ROADMAP_ARCHIVE.md](ROADMAP_ARCHIVE.md)**.
 |---|---|
 | Editorial policy and guardrails | strong — registry is provably untouched |
 | Architecture | sound; the layering has held up under audit |
-| Local test coverage | good (451), and CI gates every merge |
+| Local test coverage | good (472), and CI gates every merge |
 | Retrieval correctness | sound — window server-side, cap shared round-robin, surplus carried |
 | Judge stage | sound — its verdict is used, validated, and never faked |
 | Data-contract validation | validated against the models on every read and write |
@@ -104,7 +104,7 @@ Ordered by what blocks live writes. `R#` = from the external review, `A#` = from
 
 ## Tests
 
-**Passing:** 451 / 451 (`python -m pytest`) — no network, no API keys.
+**Passing:** 472 / 472 (`python -m pytest`) — no network, no API keys.
 **Gating merges:** ✅ `ci.yml` on every push and pull request.
 **Coverage gap closed:** `test_judge.py` now exercises the judge path end to end. The gap
 was structural — `test_merge.outcome()` defaults to a deterministic identifier match, so
@@ -114,6 +114,34 @@ every one of 232 tests took the branch that has no judge in it.
 ---
 
 ## Completed since the re-plan
+
+### Sprint 7 — automated signals on the site ✅
+
+Also no model call. The pipeline's working set was invisible: candidates existed only in a
+JSON file nobody outside the repository could see. Showing them is useful — and is also the
+easiest possible way to destroy what this site is for, so the whole design is about
+separation.
+
+- **A separate feed.** `public/data/signals.json`, never `conjectures.json`. A test builds
+  the site with and without candidates present and asserts the curated outputs are
+  **byte-identical** — that is the precise claim, rather than an assertion about some
+  particular figure.
+- **An allowlist, not a blocklist.** A field added to the candidate model later has to be
+  chosen for publication deliberately instead of being inherited. `summary` is excluded: it
+  is a model's prose about someone else's post. So are `impact`, `assessment` and
+  `confidence` — judgements no automated record is entitled to.
+- **A separate type in TypeScript.** `Signal` is not a subset of `MathResult`, so the
+  compiler objects if anyone tries to mix them into one list or one metric.
+- **Rendered unlike the tracker**: below the methodology, dashed rule, no card, monospaced
+  and small, and **never `--good`** — green means audited, which is the one thing a signal
+  can never be. The panel vanishes entirely when empty rather than showing a zero state,
+  because an empty box would imply the pipeline is running and finding nothing.
+- **A missing feed is not an error.** The tracker renders perfectly without it; failing the
+  page because an unverified sidebar is unavailable would let the least trustworthy data take
+  the most important page down.
+
+Verified in the browser against three seeded candidates: three rows, correct evidence-tier
+labels, no green anywhere in the panel, no console errors.
 
 ### Sprint 6.5 — the curator's workbench ✅
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { MathResult } from "@/types/result";
 import { useDataset } from "@/hooks/useDataset";
 import { useFilters } from "@/hooks/useFilters";
+import { useSignals } from "@/hooks/useSignals";
 import { useTheme } from "@/hooks/useTheme";
 import { applyFilters, computeMetrics } from "@/lib/filters";
 import { Masthead } from "@/components/Masthead";
@@ -15,6 +16,7 @@ import { FortnightGrid } from "@/components/charts/FortnightGrid";
 import { Ledger } from "@/components/Ledger";
 import { ResultDrawer } from "@/components/ResultDrawer";
 import { MethodologyFooter } from "@/components/MethodologyFooter";
+import { SignalsPanel } from "@/components/SignalsPanel";
 import { Card, CardTitle } from "@/components/ui/primitives";
 
 export function App() {
@@ -22,6 +24,7 @@ export function App() {
   const [filters, update, reset] = useFilters();
   const [selected, setSelected] = useState<MathResult | null>(null);
 
+  const signals = useSignals();
   const [theme, toggleTheme] = useTheme();
   const themeKey = theme;
 
@@ -92,6 +95,8 @@ export function App() {
 
               <Ledger rows={filtered} onSelect={setSelected} />
               <MethodologyFooter />
+
+              <SignalsPanel feed={signals} />
             </div>
 
             <footer className="mt-12 border-t border-rule pt-5 text-[11px] leading-relaxed text-muted">
